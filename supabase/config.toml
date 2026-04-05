@@ -1,0 +1,31 @@
+project_id = "hvpylzrcbswxhyjbgelz"
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.create-ticket-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.notify-concert-start]
+verify_jwt = false
+
+[functions.assign-monthly-badges]
+verify_jwt = false
+
+[functions.notify-request-status]
+verify_jwt = false
+
+[functions.welcome-email]
+verify_jwt = false
+
+[functions.admin-daily-report]
+verify_jwt = false
+
+[functions.notify-user-event]
+verify_jwt = false
+
+[functions.concert-reminders]
+verify_jwt = false
