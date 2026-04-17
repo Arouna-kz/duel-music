@@ -1,6 +1,19 @@
-import { Music2, Facebook, Instagram, Youtube, Download } from "lucide-react";
+import { Facebook, Instagram, Youtube, Download } from "lucide-react";
+import logoImg from "@/assets/logo-tr.png";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { usePricingEnabled } from "@/hooks/usePlatformConfig";
+
+const PricingLink = () => {
+  const { t } = useLanguage();
+  const { data: enabled } = usePricingEnabled();
+  if (enabled === false) return null;
+  return (
+    <Link to="/pricing" className="text-muted-foreground hover:text-primary transition-colors">
+      {t("pricing")}
+    </Link>
+  );
+};
 
 // X (formerly Twitter) icon component
 const XIcon = ({ className }: { className?: string }) => (
@@ -21,11 +34,8 @@ const Footer = () => {
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Music2 className="w-6 h-6 text-primary" />
-              <span className="text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">
-                Duel Music
-              </span>
+            <div className="flex items-center">
+              <img src={logoImg} alt="Duel Music" className="h-10" />
             </div>
             <p className="text-sm text-muted-foreground">
               {t("footerTagline")}
@@ -93,9 +103,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/pricing" className="text-muted-foreground hover:text-primary transition-colors">
-                  {t("pricing")}
-                </Link>
+                <PricingLink />
               </li>
               <li>
                 <Link to="/blog" className="text-muted-foreground hover:text-primary transition-colors">
@@ -157,7 +165,10 @@ const Footer = () => {
         </div>
 
         <div className="pt-4 text-center text-sm text-muted-foreground">
-          <p>© 2025 Duel Music. {t("allRightsReserved")}</p>
+          <p>
+            © 2025 Duel Music {language === "fr" ? "par" : "by"}{" "}
+            <span className="font-semibold text-foreground">Synergy Network</span>. {t("allRightsReserved")}
+          </p>
         </div>
       </div>
     </footer>

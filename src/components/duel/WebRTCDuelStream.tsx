@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from "react";
-import { useWebRTCSignaling } from "@/hooks/useWebRTCSignaling";
+import { useLiveKit } from "@/hooks/useLiveKit";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Video, VideoOff, Mic, MicOff, Radio, Wifi, WifiOff, Pause, Play, SwitchCamera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,7 @@ interface WebRTCDuelStreamProps {
   duelId?: string;
   oderId: string;
   participantName: string;
+  avatarUrl?: string | null;
   isCurrentUser: boolean;
   isParticipant: boolean;
   onStreamReady?: (stream: MediaStream) => void;
@@ -47,6 +49,7 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
   duelId,
   oderId,
   participantName,
+  avatarUrl,
   isCurrentUser,
   isParticipant,
   onStreamReady,
@@ -66,6 +69,8 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isForceMuted, setIsForceMuted] = useState(false);
+  // Track if remote video is actually active (driven by track events, NOT inspected on every render)
+  const [remoteVideoActive, setRemoteVideoActive] = useState(false);
   // Track if we ever unlocked media elements with user gesture
   const mediaUnlockedRef = useRef(false);
 
@@ -81,10 +86,12 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
     toggleVideo,
     toggleAudio,
     switchCamera,
-  } = useWebRTCSignaling({
-    roomId,
+  } = useLiveKit({
+    roomName: roomId,
     userId: effectiveUserId,
     isHost: isCurrentUser && isParticipant,
+    participantName,
+    canPublish: isCurrentUser && isParticipant,
     onRemoteStream: (stream) => {
       if (!isCurrentUser) {
         applyStreamToElements(stream);
@@ -190,6 +197,66 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
     return () => clearInterval(retryInterval);
   }, [isCurrentUser, remoteStreams, isConnected]);
 
+  // Track remote video state via track events (not by inspecting on every render).
+  // Newly subscribed remote tracks can have track.muted=true momentarily even when video is playing,
+  // so we drive UI off real ended/mute/unmute events + an initial debounce.
+  useEffect(() => {
+    if (isCurrentUser) {
+      setRemoteVideoActive(false);
+      return;
+    }
+    const remoteStream = Array.from(remoteStreams.values())[0];
+    if (!remoteStream) {
+      setRemoteVideoActive(false);
+      return;
+    }
+
+    const evaluate = () => {
+      const videoTracks = remoteStream.getVideoTracks();
+      const hasUsableVideo = videoTracks.some(
+        (t) => t.readyState === "live" && t.enabled && !t.muted
+      );
+      // Optimistic: if there is a live track at all (even if temporarily muted), keep it active
+      // for the first 2s after subscription to avoid a false "camera disabled" flash.
+      const hasAnyLive = videoTracks.some((t) => t.readyState === "live" && t.enabled);
+      setRemoteVideoActive(hasUsableVideo || hasAnyLive);
+    };
+
+    evaluate();
+
+    const handlers: Array<() => void> = [];
+    remoteStream.getVideoTracks().forEach((track) => {
+      const onMute = () => {
+        // Real "muted" only matters if it stays muted — give 800ms grace
+        setTimeout(evaluate, 800);
+      };
+      const onUnmute = () => evaluate();
+      const onEnded = () => evaluate();
+      track.addEventListener("mute", onMute);
+      track.addEventListener("unmute", onUnmute);
+      track.addEventListener("ended", onEnded);
+      handlers.push(() => {
+        track.removeEventListener("mute", onMute);
+        track.removeEventListener("unmute", onUnmute);
+        track.removeEventListener("ended", onEnded);
+      });
+    });
+
+    const onAdd = () => evaluate();
+    const onRemove = () => evaluate();
+    remoteStream.addEventListener("addtrack", onAdd);
+    remoteStream.addEventListener("removetrack", onRemove);
+
+    const interval = setInterval(evaluate, 1500);
+
+    return () => {
+      handlers.forEach((fn) => fn());
+      remoteStream.removeEventListener("addtrack", onAdd);
+      remoteStream.removeEventListener("removetrack", onRemove);
+      clearInterval(interval);
+    };
+  }, [isCurrentUser, remoteStreams]);
+
   // Unlock media elements on any user interaction (touch/click)
   useEffect(() => {
     if (isCurrentUser) return;
@@ -235,6 +302,12 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
       .on("broadcast", { event: "FORCE_UNMUTE" }, (payload) => {
         const targetArtistId = payload.payload?.artistId;
         if (targetArtistId !== oderId) return;
+        // Re-enable the audio track + LiveKit publication so the artist can be heard again
+        if (localStream) {
+          localStream.getAudioTracks().forEach((track) => { track.enabled = true; });
+        }
+        toggleAudio(true);
+        setIsMicOn(true);
         setIsForceMuted(false);
       })
       .subscribe();
@@ -279,9 +352,10 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
       toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
       return;
     }
+    // Connect to room FIRST, then start local stream (so tracks get published)
+    await joinRoom();
     const stream = await startLocalStream(true, true);
     if (stream) {
-      await joinRoom();
       setIsStreaming(true);
       toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
     }
@@ -380,6 +454,39 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
           <div className="text-center">
             <Pause className="w-10 h-10 text-yellow-500 mx-auto mb-2" />
             <p className="text-white font-bold">{t("streamPaused")}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Camera off overlay — show avatar instead of black (for current user) */}
+      {isStreaming && !isPaused && !isCameraOn && isCurrentUser && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/80">
+          <div className="text-center">
+            <Avatar className="w-16 h-16 mx-auto mb-2 border-2 border-border">
+              <AvatarImage src={avatarUrl || ""} />
+              <AvatarFallback className="text-lg">{participantName?.charAt(0) || "?"}</AvatarFallback>
+            </Avatar>
+            <p className="text-foreground text-xs font-medium">{participantName}</p>
+            <p className="text-muted-foreground text-[10px] mt-0.5">
+              <VideoOff className="w-3 h-3 inline mr-0.5" />Caméra désactivée
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Camera off overlay for VIEWERS — driven by remoteVideoActive state, not per-render inspection.
+          This avoids the false "Caméra désactivée" flash on initial subscription when t.muted is briefly true. */}
+      {!isCurrentUser && hasRemoteStream && !remoteVideoActive && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/80">
+          <div className="text-center">
+            <Avatar className="w-16 h-16 mx-auto mb-2 border-2 border-border">
+              <AvatarImage src={avatarUrl || ""} />
+              <AvatarFallback className="text-lg">{participantName?.charAt(0) || "?"}</AvatarFallback>
+            </Avatar>
+            <p className="text-foreground text-xs font-medium">{participantName}</p>
+            <p className="text-muted-foreground text-[10px] mt-0.5">
+              <VideoOff className="w-3 h-3 inline mr-0.5" />{t("cameraDisabled")}
+            </p>
           </div>
         </div>
       )}

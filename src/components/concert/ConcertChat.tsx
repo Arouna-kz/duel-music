@@ -86,14 +86,14 @@ export const ConcertChat = ({ concertId }: ConcertChatProps) => {
     };
   }, [concertId, currentUser?.id]);
 
+  // Auto-scroll chat without moving the whole page
   useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM has updated
     requestAnimationFrame(() => {
       if (scrollRef.current) {
         scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
     });
-  }, [messages]);
+  }, [messages.length]);
 
   const loadCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();

@@ -4,14 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Heart, ArrowLeft, LogOut } from "lucide-react";
+import { Heart, ArrowLeft, LogOut, Users } from "lucide-react";
 import { ShareButton } from "@/components/sharing/ShareButton";
 import Header from "@/components/Header";
 import { FollowArtistButton } from "@/components/artist/FollowArtistButton";
 import Footer from "@/components/Footer";
-import { ConcertChat } from "@/components/concert/ConcertChat";
 import ConcertGiftPanel from "@/components/concert/ConcertGiftPanel";
 import { QuickTip } from "@/components/duel/QuickTip";
 import { GiftLeaderboard } from "@/components/duel/GiftLeaderboard";
@@ -25,6 +25,7 @@ import { FullscreenButton } from "@/components/streaming/FullscreenButton";
 import { SpeakingTimerOverlay } from "@/components/streaming/SpeakingTimerOverlay";
 import { VideoZoomWrapper } from "@/components/streaming/VideoZoomWrapper";
 import { MobileStreamOverlay } from "@/components/streaming/MobileStreamOverlay";
+import { ThreadedChat } from "@/components/chat/ThreadedChat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { WebRTCHostControls } from "@/components/concert/WebRTCHost";
 
@@ -36,6 +37,7 @@ const ConcertLive = () => {
   const isMobile = useIsMobile();
   const [hostStream, setHostStream] = useState<MediaStream | null>(null);
   const [likes, setLikes] = useState(0);
+  const [viewerCount, setViewerCount] = useState(0);
   const likesLoadedRef = useRef(false);
   const likesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [isArtist, setIsArtist] = useState(false);
@@ -79,6 +81,26 @@ const ConcertLive = () => {
       supabase.removeChannel(channel);
       likesChannelRef.current = null;
     };
+  }, [id]);
+
+  // Presence for viewer count
+  useEffect(() => {
+    if (!id) return;
+    const presenceChannel = supabase.channel(`concert-presence-${id}`, {
+      config: { presence: { key: crypto.randomUUID() } },
+    });
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const count = Object.keys(state).length;
+        setViewerCount(count);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({ online_at: new Date().toISOString() });
+        }
+      });
+    return () => { supabase.removeChannel(presenceChannel); };
   }, [id]);
 
   const { data: concert, isLoading, refetch } = useQuery({
@@ -421,6 +443,7 @@ const ConcertLive = () => {
             <WebRTCHost
               roomId={roomId}
               hostId={currentUserId}
+              hostName={concert.artist_name}
               hideMobileControls={true}
               onStreamStart={handleStreamStart}
               onStreamStop={handleStreamStop}
@@ -433,6 +456,7 @@ const ConcertLive = () => {
               viewerId={currentUserId}
               concertTitle={concert.title}
               artistName={concert.artist_name}
+              artistAvatarUrl={(concert as any).image_url || null}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
@@ -448,7 +472,7 @@ const ConcertLive = () => {
           <MobileStreamOverlay
             defaultHidden={false}
             isLive={isLive}
-            viewerCount={0}
+            viewerCount={viewerCount}
             likes={likes}
             onLike={sendLike}
             chatMessages={mobileChatMessages}
@@ -471,11 +495,7 @@ const ConcertLive = () => {
               <ShareButton contentType="concert" contentId={id!} title={concert.title} variant="overlay" />
             }
             description={concert.description || undefined}
-            timerContent={
-              !isOrganizer && isLive ? (
-                <ConcertDurationTimer startedAt={startedAt} isLive={isLive} />
-              ) : undefined
-            }
+            timerContent={undefined}
             recordingContent={
               isOrganizer && hostStream ? (
                 <ConcertRecordingControls
@@ -530,6 +550,7 @@ const ConcertLive = () => {
                   <WebRTCHost
                     roomId={roomId}
                     hostId={currentUserId}
+                    hostName={concert.artist_name}
                     onStreamStart={handleStreamStart}
                     onStreamStop={handleStreamStop}
                     onStreamReady={(stream) => setHostStream(stream)}
@@ -540,6 +561,7 @@ const ConcertLive = () => {
                     viewerId={currentUserId}
                     concertTitle={concert.title}
                     artistName={concert.artist_name}
+                    artistAvatarUrl={(concert as any).image_url || null}
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
@@ -555,18 +577,21 @@ const ConcertLive = () => {
                 <FloatingHearts hearts={hearts} />
                 <FloatingEmojis emojis={floatingEmojis} />
 
-                {/* Likes counter overlay */}
-                <div className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2 z-10">
-                  <Heart className="w-5 h-5 fill-destructive text-destructive" />
-                  {likes}
-                </div>
-
-                {/* Duration timer for viewers */}
-                {!isOrganizer && isLive && (
-                  <div className="absolute top-4 left-4 z-10">
-                    <ConcertDurationTimer startedAt={startedAt} isLive={isLive} />
+                {/* Top overlay bar: badge, viewer count, timer, likes */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
+                  <div className="flex items-center gap-2">
+                    {isLive && (
+                      <Badge className="bg-destructive text-destructive-foreground animate-pulse">🎵 CONCERT</Badge>
+                    )}
+                    <Badge variant="outline" className="bg-background/50 text-foreground border-border/30">
+                      <Users className="w-3 h-3 mr-1" /> {viewerCount}
+                    </Badge>
                   </div>
-                )}
+                  <div className="bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2">
+                    <Heart className="w-5 h-5 fill-destructive text-destructive" />
+                    {likes}
+                  </div>
+                </div>
 
                 {/* Fullscreen toggle (desktop) */}
                 <div className="absolute bottom-4 left-4 z-20">
@@ -644,7 +669,7 @@ const ConcertLive = () => {
             {/* Gift Leaderboard */}
             <GiftLeaderboard concertId={id!} />
             <div className="h-[400px] overflow-hidden">
-              <ConcertChat concertId={id!} />
+              <ThreadedChat chatType="concert" entityId={id!} />
             </div>
           </div>
         </div>

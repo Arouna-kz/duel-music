@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Music2, Eye, EyeOff, Search, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { Eye, EyeOff, Search, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -256,7 +257,7 @@ const Auth = () => {
 
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-4">
-            <Music2 className="w-8 h-8 text-primary" />
+            <img src={logoImg} alt="Duel Music" className="w-8 h-8" />
             <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               Duel Music
             </span>

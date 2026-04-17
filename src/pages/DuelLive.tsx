@@ -39,6 +39,20 @@ interface Profile {
   avatar_url: string | null;
 }
 
+interface DuelChatMessage {
+  id: string;
+  created_at: string;
+  duel_id: string;
+  is_moderated: boolean | null;
+  message: string;
+  parent_id: string | null;
+  user_id: string;
+  user_name: string;
+  avatar_url: string | null;
+  reply_to_name?: string;
+  reply_to_message?: string;
+}
+
 type StreamSlot = 'artist1' | 'artist2' | 'manager';
 
 type MediaState = { isMicOn: boolean; isCameraOn: boolean; isStreaming: boolean; isPaused: boolean };
@@ -66,7 +80,7 @@ const DuelLive = () => {
   const [managerTimerRemaining, setManagerTimerRemaining] = useState(0);
   const managerTimerDeadlineRef = useRef<number | null>(null);
   const [likes, setLikes] = useState(0);
-  const [mobileChatMessages, setMobileChatMessages] = useState<any[]>([]);
+  const [mobileChatMessages, setMobileChatMessages] = useState<DuelChatMessage[]>([]);
   const [winnerAnnouncement, setWinnerAnnouncement] = useState<{ name: string; avatar: string | null; votes: number } | null>(null);
   const winnerChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   // Track media state for each slot (local + remote via broadcast)
@@ -569,7 +583,30 @@ const DuelLive = () => {
           const userIds = [...new Set(msgs.map(m => m.user_id))];
           const { data: profs } = await supabase.rpc("get_display_profiles", { user_ids: userIds });
           const pm = new Map(profs?.map(p => [p.id, p]) || []);
-          setMobileChatMessages(msgs.map(m => ({ ...m, user_name: pm.get(m.user_id)?.full_name || "Utilisateur", avatar_url: pm.get(m.user_id)?.avatar_url })));
+          const msgMap = new Map<string, DuelChatMessage>();
+          const enriched: DuelChatMessage[] = msgs.map((m) => {
+            const message: DuelChatMessage = {
+              ...m,
+              user_name: pm.get(m.user_id)?.full_name || "Utilisateur",
+              avatar_url: pm.get(m.user_id)?.avatar_url ?? null,
+            };
+            msgMap.set(m.id, message);
+            return message;
+          });
+          setMobileChatMessages(
+            enriched.map((message) => {
+              if (!message.parent_id) return message;
+
+              const parent = msgMap.get(message.parent_id);
+              if (!parent) return message;
+
+              return {
+                ...message,
+                reply_to_name: parent.user_name,
+                reply_to_message: parent.message,
+              };
+            })
+          );
         }
       };
       loadMobileChat();
@@ -580,8 +617,17 @@ const DuelLive = () => {
           const { data: profArr } = await supabase.rpc("get_display_profiles", { user_ids: [msg.user_id] });
           const profile = profArr?.[0] || null;
           setMobileChatMessages(prev => {
-            if (prev.some((m: any) => m.id === msg.id)) return prev;
-            return [...prev.slice(-49), { ...msg, user_name: profile?.full_name || "Utilisateur", avatar_url: profile?.avatar_url }];
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            const parent = prev.find((m) => m.id === msg.parent_id);
+            const nextMessage: DuelChatMessage = {
+              ...msg,
+              user_name: profile?.full_name || "Utilisateur",
+              avatar_url: profile?.avatar_url ?? null,
+              reply_to_name: parent?.user_name,
+              reply_to_message: parent?.message,
+            };
+
+            return [...prev.slice(-49), nextMessage];
           });
         })
         .subscribe();
@@ -637,9 +683,8 @@ const DuelLive = () => {
     const winnerProfile = winnerId === duel.artist1_id ? profiles.artist1 : profiles.artist2;
     const winnerVoteCount = winnerId === duel.artist1_id ? a1votes : a2votes;
 
-    // Save winner to DB
-    const now = new Date().toISOString();
-    await supabase.from("duels").update({ winner_id: winnerId, status: "ended", ended_at: now } as any).eq("id", id);
+    // Save winner to DB but do NOT end the duel
+    await supabase.from("duels").update({ winner_id: winnerId } as any).eq("id", id);
 
     const payload = { name: winnerProfile?.full_name || "Vainqueur", avatar: winnerProfile?.avatar_url || null, votes: winnerVoteCount };
     setWinnerAnnouncement(payload);
@@ -648,7 +693,7 @@ const DuelLive = () => {
     winnerChannelRef.current?.send({ type: "broadcast", event: "winner_announced", payload });
   };
 
-  // Winner announcement channel
+  // Winner announcement channel — listens to both announce and stop events from manager
   useEffect(() => {
     if (!id) return;
     const channel = supabase
@@ -656,10 +701,19 @@ const DuelLive = () => {
       .on("broadcast", { event: "winner_announced" }, (msg) => {
         setWinnerAnnouncement(msg.payload);
       })
+      .on("broadcast", { event: "winner_stopped" }, () => {
+        setWinnerAnnouncement(null);
+      })
       .subscribe();
     winnerChannelRef.current = channel;
     return () => { winnerChannelRef.current = null; supabase.removeChannel(channel); };
   }, [id]);
+
+  // When manager stops the animation locally, broadcast the stop to everyone
+  const handleStopWinnerAnnouncement = useCallback(() => {
+    setWinnerAnnouncement(null);
+    winnerChannelRef.current?.send({ type: "broadcast", event: "winner_stopped", payload: {} });
+  }, []);
 
   const endDuel = async () => {
     const now = new Date().toISOString();
@@ -772,6 +826,7 @@ const DuelLive = () => {
           oderId={slotId}
           signalingUserId={currentUserId || undefined}
           participantName={getSlotName(slot)}
+          avatarUrl={profiles[slot]?.avatar_url}
           isCurrentUser={currentUserId === slotId}
           isParticipant={currentUserId === slotId}
           onStreamReady={handleStreamReady}
@@ -883,12 +938,6 @@ const DuelLive = () => {
               >
                 {renderStream(slot, true, isFocused ? false : true)}
 
-                {/* Focused: only minimize button (name/media moved to top bar) */}
-                {isFocused && (
-                  <button onClick={(e) => { e.stopPropagation(); setFocusedSlot(null); }} className="absolute top-14 right-3 z-50 w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center" title="Réduire">
-                    <Minimize className="w-4 h-4 text-white" />
-                  </button>
-                )}
 
                 {/* Overlay thumbnail label */}
                 {isOverlay && showThumbnails && (
@@ -898,34 +947,24 @@ const DuelLive = () => {
                   </div>
                 )}
 
-                {/* Main slot labels */}
+                {/* Main slot labels — tap slot to focus, no Maximize icon (use top bar toggle) */}
                 {isMain && (
-                  <>
-                    <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
-                      <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm flex items-center gap-1.5">
-                        {getSlotLabel(slot)}
-                        <MediaIndicator slot={slot} />
-                      </span>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); setFocusedSlot(slot); }} className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/50 flex items-center justify-center">
-                      <Maximize className="w-3.5 h-3.5 text-white" />
-                    </button>
-                  </>
+                  <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
+                    <span className="bg-black/60 text-white text-xs px-2 py-1 rounded-md backdrop-blur-sm flex items-center gap-1.5 cursor-pointer" onClick={(e) => { e.stopPropagation(); setFocusedSlot(slot); }}>
+                      {getSlotLabel(slot)}
+                      <MediaIndicator slot={slot} />
+                    </span>
+                  </div>
                 )}
 
-                {/* Secondary slot labels */}
+                {/* Secondary slot labels — tap to focus */}
                 {isSecondary && (
-                  <>
-                    <div className="absolute bottom-1 left-1 z-10 flex items-center gap-1">
-                      <span className="bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center gap-1">
-                        {getSlotLabel(slot)}
-                        <MediaIndicator slot={slot} small />
-                      </span>
-                    </div>
-                    <button onClick={(e) => { e.stopPropagation(); setFocusedSlot(slot); }} className="absolute top-1 right-1 z-10 w-6 h-6 rounded-full bg-black/50 flex items-center justify-center">
-                      <Maximize className="w-3 h-3 text-white" />
-                    </button>
-                  </>
+                  <div className="absolute bottom-1 left-1 z-10 flex items-center gap-1">
+                    <span className="bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm flex items-center gap-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); setFocusedSlot(slot); }}>
+                      {getSlotLabel(slot)}
+                      <MediaIndicator slot={slot} small />
+                    </span>
+                  </div>
                 )}
               </div>
             );
@@ -954,7 +993,17 @@ const DuelLive = () => {
             onEmojiReact={addEmoji}
             videoContainerRef={videoContainerRef as any}
             rightTopContent={
-              <ShareButton contentType="duel" contentId={id!} title={`Duel: ${profiles.artist1?.full_name || ''} vs ${profiles.artist2?.full_name || ''}`} variant="overlay" />
+              <>
+                <ShareButton contentType="duel" contentId={id!} title={`Duel: ${profiles.artist1?.full_name || ''} vs ${profiles.artist2?.full_name || ''}`} variant="overlay" />
+                {/* Layout toggle: focus main slot or return to grid view (NOT a fullscreen toggle — mobile is already fullscreen) */}
+                <button
+                  onClick={() => setFocusedSlot(prev => prev ? null : getMainSlot())}
+                  className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center"
+                  title={focusedSlot ? t("gridView") || "Vue grille" : t("focusView") || "Mettre au centre"}
+                >
+                  {focusedSlot ? <Users className="w-4 h-4 text-white" /> : <Maximize className="w-4 h-4 text-white" />}
+                </button>
+              </>
             }
             focusedParticipantInfo={focusedSlot ? { name: getSlotName(focusedSlot), isMicOn: mediaStates[focusedSlot].isMicOn, isCameraOn: mediaStates[focusedSlot].isCameraOn } : null}
             title={duelDescription}
@@ -988,7 +1037,15 @@ const DuelLive = () => {
             }
             recordingContent={
               isManager && hostStream ? (
-                <ConcertRecordingControls stream={hostStream} concertId={id!} userId={currentUserId!} isArtistConcert={false} onRecordingSaved={() => {}} />
+                <ConcertRecordingControls
+                  stream={hostStream}
+                  concertId={id!}
+                  userId={currentUserId!}
+                  isArtistConcert={false}
+                  isDuel={true}
+                  duelTitle={`Duel: ${profiles.artist1?.full_name || 'A1'} vs ${profiles.artist2?.full_name || 'A2'}`}
+                  onRecordingSaved={() => {}}
+                />
               ) : undefined
             }
             extraControls={
@@ -1053,7 +1110,7 @@ const DuelLive = () => {
                     </div>
                   )}
                    <Button size="sm" className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold" onClick={announceWinner} disabled={!!winnerAnnouncement}>
-                     <Trophy className="w-3 h-3 mr-1" />{t("announceWinnerBtn")}
+                     <Trophy className="w-3 h-3 mr-1" />{t("announceWinner")}
                    </Button>
                    <Button size="sm" variant="destructive" className="w-full" onClick={endDuel}>
                      <UserX className="w-3 h-3 mr-1" />{t("endDuelBtn")}
@@ -1071,7 +1128,7 @@ const DuelLive = () => {
             )
           )}
           {winnerAnnouncement && (
-            <WinnerAnnouncement winnerName={winnerAnnouncement.name} winnerAvatar={winnerAnnouncement.avatar} winnerVotes={winnerAnnouncement.votes} onStop={() => setWinnerAnnouncement(null)} />
+            <WinnerAnnouncement winnerName={winnerAnnouncement.name} winnerAvatar={winnerAnnouncement.avatar} winnerVotes={winnerAnnouncement.votes} onStop={handleStopWinnerAnnouncement} canDismiss={isManager} />
           )}
         </div>
       </div>
@@ -1187,24 +1244,26 @@ const DuelLive = () => {
                   </>
                 )}
 
-                {/* Overlays */}
-                <div className="absolute top-4 left-4 flex items-center gap-2 z-10 pointer-events-none">
-                  {isLive && <Badge className="bg-destructive text-destructive-foreground animate-pulse pointer-events-auto">⚔️ DUEL</Badge>}
-                  <Badge variant="outline" className="bg-background/50 text-foreground border-border/30 pointer-events-auto"><Users className="w-3 h-3 mr-1" /> {viewersCount}</Badge>
-                  {/* Focused slot info in top bar on desktop */}
-                  {focusedSlot && (
-                    <div className="flex items-center gap-1.5 bg-background/50 backdrop-blur-sm px-3 py-1.5 rounded-full pointer-events-auto">
-                      <span className="text-foreground text-xs font-semibold truncate max-w-[150px]">{getSlotName(focusedSlot)}</span>
-                      <MediaIndicator slot={focusedSlot} />
-                    </div>
-                  )}
-                </div>
-                <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-10">
-                  <button onClick={sendLike} className="bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:bg-background/70 transition-colors">
-                    <Heart className="w-5 h-5 fill-destructive text-destructive" /> {likes}
-                  </button>
-                  <ShareButton contentType="duel" contentId={id!} title={`Duel: ${profiles.artist1?.full_name || ''} vs ${profiles.artist2?.full_name || ''}`} variant="overlay" />
-                  <FullscreenButton targetRef={videoContainerRef} />
+                {/* Overlays - single top bar with all controls */}
+                <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10 pointer-events-none">
+                  <div className="flex items-center gap-2 pointer-events-auto">
+                    {isLive && <Badge className="bg-destructive text-destructive-foreground animate-pulse">⚔️ DUEL</Badge>}
+                    <Badge variant="outline" className="bg-background/50 text-foreground border-border/30"><Users className="w-3 h-3 mr-1" /> {viewersCount}</Badge>
+                    {/* Focused slot info in top bar on desktop */}
+                    {focusedSlot && (
+                      <div className="flex items-center gap-1.5 bg-background/50 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                        <span className="text-foreground text-xs font-semibold truncate max-w-[150px]">{getSlotName(focusedSlot)}</span>
+                        <MediaIndicator slot={focusedSlot} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pointer-events-auto">
+                    <button onClick={sendLike} className="bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:bg-background/70 transition-colors">
+                      <Heart className="w-5 h-5 fill-destructive text-destructive" /> {likes}
+                    </button>
+                    <ShareButton contentType="duel" contentId={id!} title={`Duel: ${profiles.artist1?.full_name || ''} vs ${profiles.artist2?.full_name || ''}`} variant="overlay" />
+                    <FullscreenButton targetRef={videoContainerRef} />
+                  </div>
                 </div>
                 <FloatingHearts hearts={hearts} />
                 <FloatingEmojis emojis={floatingEmojis} />
@@ -1336,7 +1395,7 @@ const DuelLive = () => {
                     </div>
                   )}
                    <Button size="sm" className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold" onClick={announceWinner} disabled={!!winnerAnnouncement}>
-                     <Trophy className="w-3 h-3 mr-1" />{t("announceWinnerBtn")}
+                     <Trophy className="w-3 h-3 mr-1" />{t("announceWinner")}
                    </Button>
                    <Button size="sm" variant="destructive" className="w-full" onClick={endDuel}>
                      <UserX className="w-3 h-3 mr-1" />{t("endDuelBtn")}
@@ -1377,7 +1436,8 @@ const DuelLive = () => {
           winnerName={winnerAnnouncement.name}
           winnerAvatar={winnerAnnouncement.avatar}
           winnerVotes={winnerAnnouncement.votes}
-          onStop={() => setWinnerAnnouncement(null)}
+          onStop={handleStopWinnerAnnouncement}
+          canDismiss={isManager}
         />
       )}
     </div>

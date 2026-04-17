@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useWebRTCSignaling } from "@/hooks/useWebRTCSignaling";
+import { useLiveKit } from "@/hooks/useLiveKit";
 import { supabase } from "@/integrations/supabase/client";
 import { Maximize, Minimize, Video, VideoOff, Mic, MicOff, Timer } from "lucide-react";
 
@@ -99,21 +99,20 @@ export const GuestVideoBox = ({
     syncMediaState(stream);
   }, [syncMediaState]);
 
-  useEffect(() => {
-    if (!isMe || !localStream) return;
-    attachStream(localStream);
-  }, [isMe, localStream, attachStream]);
-
   const {
     remoteStreams,
     joinRoom,
     leaveRoom,
-  } = useWebRTCSignaling({
-    roomId: guestRoomId,
+    startLocalStream,
+    toggleAudio,
+    toggleVideo,
+  } = useLiveKit({
+    roomName: guestRoomId,
     userId: currentUserId || "anon",
-    isHost: false,
-    onRemoteStream: (stream) => {
-      attachStream(stream);
+    isHost: isMe,
+    canPublish: isMe,
+    onRemoteStream: (stream: MediaStream) => {
+      if (!isMe) attachStream(stream);
     },
     onPeerLeave: () => {
       setHasVideo(false);
@@ -122,13 +121,34 @@ export const GuestVideoBox = ({
     },
   });
 
+  // For self (isMe): when localStream changes, attach and publish/unpublish via LiveKit.
+  // CRITICAL: toggleAudio/toggleVideo actually mute/unmute the published tracks at the SFU level,
+  // so other participants stop receiving the stream when toggled off.
+  const lastPublishedRef = useRef<{ video: boolean; audio: boolean }>({ video: false, audio: false });
   useEffect(() => {
-    if (!isMe && currentUserId) {
+    if (!isMe || !localStream) return;
+    attachStream(localStream);
+    const wantsVideo = localStream.getVideoTracks().some(t => t.enabled && t.readyState === "live");
+    const wantsAudio = localStream.getAudioTracks().some(t => t.enabled && t.readyState === "live");
+
+    // First time → start local stream so LiveKit publishes the tracks
+    if (!lastPublishedRef.current.video && !lastPublishedRef.current.audio) {
+      startLocalStream(wantsVideo, wantsAudio);
+    } else {
+      // Subsequent toggles → just mute/unmute the published track at LiveKit level
+      if (lastPublishedRef.current.video !== wantsVideo) toggleVideo(wantsVideo);
+      if (lastPublishedRef.current.audio !== wantsAudio) toggleAudio(wantsAudio);
+    }
+    lastPublishedRef.current = { video: wantsVideo, audio: wantsAudio };
+  }, [isMe, localStream, attachStream, startLocalStream, toggleAudio, toggleVideo]);
+
+  useEffect(() => {
+    if (currentUserId) {
       joinRoom();
       return () => { leaveRoom(); };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMe, currentUserId]);
+  }, [currentUserId]);
 
   useEffect(() => {
     if (!isMe) {
@@ -296,26 +316,6 @@ export const GuestVideoBox = ({
  * Hook for a guest to broadcast their stream via WebRTC to all viewers.
  */
 export const useGuestBroadcast = (liveId: string | undefined, userId: string | null, stream: MediaStream | null) => {
-  const guestRoomId = liveId && userId ? `live-guest-${liveId}-${userId}` : "";
-
-  const {
-    joinRoom,
-    leaveRoom,
-  } = useWebRTCSignaling({
-    roomId: guestRoomId || "noop",
-    userId: userId || "noop",
-    isHost: true,
-    externalStream: stream,
-    onPeerJoin: (peerId) => {
-      console.log("Viewer connected to guest stream:", peerId);
-    },
-  });
-
-  useEffect(() => {
-    if (!stream || !userId || !liveId) return;
-    console.log("[GuestBroadcast] Starting broadcast with stream tracks:", stream.getTracks().map(t => `${t.kind}:${t.enabled}`));
-    joinRoom();
-    return () => { leaveRoom(); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!stream, userId, liveId]);
+  // This hook is now a no-op — guest publishing is handled directly by GuestVideoBox
+  // via useLiveKit with isHost=true when isMe=true.
 };

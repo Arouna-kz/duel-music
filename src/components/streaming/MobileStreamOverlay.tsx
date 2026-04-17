@@ -163,6 +163,33 @@ export const MobileStreamOverlay = ({
   const { emojis: localEmojis, addEmoji: addLocalEmoji } = useFloatingEmojis();
   const chatEndRef = useRef<HTMLDivElement>(null);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Prevent mobile keyboard from shifting the fullscreen layout
+  // Only adjust when keyboard is actually open (viewport significantly smaller than window)
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const handleResize = () => {
+      if (!overlayRef.current) return;
+      const keyboardOpen = vv.height < window.innerHeight * 0.85;
+      if (keyboardOpen) {
+        overlayRef.current.style.height = `${vv.height}px`;
+        overlayRef.current.style.transform = `translateY(${vv.offsetTop}px)`;
+      } else {
+        overlayRef.current.style.height = '';
+        overlayRef.current.style.transform = '';
+      }
+    };
+
+    vv.addEventListener("resize", handleResize);
+    vv.addEventListener("scroll", handleResize);
+    return () => {
+      vv.removeEventListener("resize", handleResize);
+      vv.removeEventListener("scroll", handleResize);
+    };
+  }, []);
 
   const closeAllPanels = () => {
     setShowGiftPanel(false);
@@ -209,7 +236,7 @@ export const MobileStreamOverlay = ({
   };
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [chatMessages]);
 
   const handleSend = () => {
@@ -218,6 +245,8 @@ export const MobileStreamOverlay = ({
     setNewMessage("");
     setReplyTo(null);
     setShowCommentPopup(false);
+    // Dismiss keyboard immediately to prevent layout shift
+    commentInputRef.current?.blur();
   };
 
   const openCommentPopup = () => {
@@ -229,7 +258,6 @@ export const MobileStreamOverlay = ({
   if (!isMobile) return null;
 
   const visibleMessages = chatMessages.slice(-maxVisibleMessages);
-  const totalGuestBadge = activeGuestCount + pendingGuestCount;
 
   if (hideOverlay) {
     return (
@@ -246,7 +274,7 @@ export const MobileStreamOverlay = ({
   }
 
   return (
-    <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-end">
+    <div ref={overlayRef} className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-end" style={{ overflow: 'hidden' }}>
       {/* Vote bar above top bar (duels) */}
       {voteBarContent && (
         <div className="absolute top-0 left-0 right-0 z-50 pointer-events-auto">
@@ -265,22 +293,22 @@ export const MobileStreamOverlay = ({
           <Badge variant="outline" className="bg-background/30 backdrop-blur-sm text-foreground border-border/30 text-xs">
             <Users className="w-3 h-3 mr-1" /> {viewerCount}
           </Badge>
-        </div>
-        {/* Center: timer or focused participant info */}
-        {timerContent ? (
-          <div className="flex-shrink-0">{timerContent}</div>
-        ) : focusedParticipantInfo ? (
-          <div className="flex items-center gap-1 bg-background/30 backdrop-blur-sm px-2 py-1 rounded-full">
-            <span className="text-foreground text-xs font-semibold truncate max-w-[80px] sm:max-w-[120px]">{focusedParticipantInfo.name}</span>
-            {focusedParticipantInfo.isMicOn ? <Mic className="w-3 h-3 text-green-400 shrink-0" /> : <MicOff className="w-3 h-3 text-destructive shrink-0" />}
-            {focusedParticipantInfo.isCameraOn ? <Video className="w-3 h-3 text-green-400 shrink-0" /> : <VideoOff className="w-3 h-3 text-destructive shrink-0" />}
-          </div>
-        ) : null}
-        <div className="flex items-center gap-1.5">
           <div className="bg-background/30 backdrop-blur-sm text-foreground px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
             <Heart className="w-3 h-3 fill-destructive text-destructive" /> {likes}
           </div>
-          {rightTopContent}
+        </div>
+        {/* Center: timer or focused participant info */}
+        <div className="flex items-center gap-1.5">
+          {timerContent ? (
+            <div className="flex-shrink-0">{timerContent}</div>
+          ) : focusedParticipantInfo ? (
+            <div className="flex items-center gap-1 bg-background/30 backdrop-blur-sm px-2 py-1 rounded-full">
+              <span className="text-foreground text-xs font-semibold truncate max-w-[80px] sm:max-w-[120px]">{focusedParticipantInfo.name}</span>
+              {focusedParticipantInfo.isMicOn ? <Mic className="w-3 h-3 text-green-400 shrink-0" /> : <MicOff className="w-3 h-3 text-destructive shrink-0" />}
+              {focusedParticipantInfo.isCameraOn ? <Video className="w-3 h-3 text-green-400 shrink-0" /> : <VideoOff className="w-3 h-3 text-destructive shrink-0" />}
+            </div>
+          ) : null}
+          {rightTopContent && <div className="flex items-center gap-1">{rightTopContent}</div>}
         </div>
       </div>
 
@@ -312,9 +340,14 @@ export const MobileStreamOverlay = ({
             className="relative w-10 h-10 rounded-full bg-background/40 backdrop-blur-sm flex items-center justify-center border border-border/30"
           >
             <UserPlus className="w-5 h-5 text-foreground" />
-            {totalGuestBadge > 0 && (
+            {pendingGuestCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {totalGuestBadge}
+                {pendingGuestCount}
+              </span>
+            )}
+            {activeGuestCount > 0 && (
+              <span className={`absolute ${pendingGuestCount > 0 ? '-bottom-1' : '-top-1'} -left-1 bg-green-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1`}>
+                {activeGuestCount}
               </span>
             )}
           </button>
@@ -438,7 +471,7 @@ export const MobileStreamOverlay = ({
       <FloatingHearts hearts={hearts} />
 
       {/* Overlay chat messages */}
-      <div className="px-3 pb-1 space-y-1 max-h-[35vh] overflow-y-auto overflow-x-hidden scrollbar-hidden pointer-events-auto w-[56%] max-w-[56%] min-w-[180px]" style={{ WebkitOverflowScrolling: 'touch' }}>
+      <div className="px-3 pb-1 space-y-1 overflow-y-auto overflow-x-hidden scrollbar-hidden pointer-events-auto w-[56%] max-w-[56%] min-w-[180px]" style={{ maxHeight: '35vh', minHeight: 0, flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
         <AnimatePresence initial={false}>
           {visibleMessages.map((msg) => (
             <motion.div
@@ -457,10 +490,12 @@ export const MobileStreamOverlay = ({
               </Avatar>
               <div className="bg-background/20 backdrop-blur-sm rounded-lg px-2 py-1 max-w-full overflow-x-hidden">
                 {msg.reply_to_name && (
-                  <div className="text-[9px] text-primary/80 flex items-center gap-0.5 mb-0.5">
-                    <Reply className="w-2 h-2" />
-                    <span className="font-medium">↩ {msg.reply_to_name}</span>
-                    <span className="truncate max-w-[100px] opacity-70">: {msg.reply_to_message}</span>
+                  <div className="mb-1 flex max-w-full items-start gap-1 rounded-md border-l-2 border-primary/70 bg-background/15 px-1.5 py-1 text-[10px] text-primary/90">
+                    <Reply className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                    <div className="min-w-0">
+                      <span className="block font-medium leading-none">{msg.reply_to_name}</span>
+                      <span className="block max-w-[120px] truncate text-primary/70 leading-tight">{msg.reply_to_message}</span>
+                    </div>
                   </div>
                 )}
                 <span className="text-[10px] font-bold text-primary mr-1">{msg.user_name}</span>
@@ -516,7 +551,7 @@ export const MobileStreamOverlay = ({
 
       {/* Bottom bar */}
       {currentUserId && (
-        <div className="px-3 pb-3 pointer-events-auto">
+        <div className="px-3 pointer-events-auto" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
           <div className="flex gap-2 items-center">
             <button
               onClick={openCommentPopup}
@@ -892,7 +927,14 @@ export const MobileStreamOverlay = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 z-[200] flex items-end pointer-events-auto"
-            onClick={(e) => { if (e.target === e.currentTarget) setShowCommentPopup(false); }}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowCommentPopup(false);
+                // Blur input to dismiss keyboard immediately
+                commentInputRef.current?.blur();
+              }
+            }}
           >
             <motion.div
               initial={{ y: "100%" }}

@@ -16,7 +16,7 @@ import {
   Users, Music, Swords, Video, TrendingUp, UserCheck, Briefcase,
   DollarSign, CheckCircle, XCircle, Clock, Eye, Ban, Trash2,
   BarChart3, Radio, Shield, ExternalLink, CreditCard, Hash, Link2, StopCircle, ClipboardList,
-  Trophy, Gift, EyeOff
+  Trophy, Gift, EyeOff, Settings
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BlogManager } from "@/components/admin/BlogManager";
@@ -28,6 +28,7 @@ import AdminLogs from "@/components/admin/AdminLogs";
 import { SubscriptionPlansManager } from "@/components/admin/SubscriptionPlansManager";
 import LeaderboardSeasonsManager from "@/components/admin/LeaderboardSeasonsManager";
 import ReferralConfigManager from "@/components/admin/ReferralConfigManager";
+import PlatformConfigManager from "@/components/admin/PlatformConfigManager";
 import LifestyleManager from "@/components/admin/LifestyleManager";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -841,6 +842,7 @@ const Admin = () => {
               <TabsTrigger value="leaderboard" className="text-xs"><Trophy className="w-3 h-3 mr-1" />{t("adminTabLeaderboard")}</TabsTrigger>
               <TabsTrigger value="referrals" className="text-xs"><Gift className="w-3 h-3 mr-1" />{t("adminTabReferrals")}</TabsTrigger>
               <TabsTrigger value="lifestyle" className="text-xs"><Video className="w-3 h-3 mr-1" />{t("adminTabLifestyle")}</TabsTrigger>
+              <TabsTrigger value="platform" className="text-xs"><Settings className="w-3 h-3 mr-1" />{t("adminTabPlatform")}</TabsTrigger>
             </TabsList>
 
             {/* ── Stats ─────────────────────────────────────────────────────── */}
@@ -1444,6 +1446,15 @@ const Admin = () => {
             {/* ── Lifestyle ────────────────────────────────────────────── */}
             <TabsContent value="lifestyle">
               <LifestyleManager />
+            </TabsContent>
+
+            {/* ── Configuration Plateforme ─────────────────────────────── */}
+            <TabsContent value="platform">
+              <Card>
+                <CardContent className="pt-6">
+                  <PlatformConfigManager />
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Heart, ArrowLeft, LogOut, Users, Hand, Mic, MicOff, Video, VideoOff, X, Check, UserPlus, Maximize, Minimize, SwitchCamera } from "lucide-react";
+import { Heart, ArrowLeft, LogOut, Users, Hand, Mic, MicOff, Video, VideoOff, X, Check, UserPlus, Maximize, Minimize, SwitchCamera, EyeOff, Eye } from "lucide-react";
 import { ShareButton } from "@/components/sharing/ShareButton";
 import { HostGuestControls } from "@/components/streaming/HostGuestControls";
 import Header from "@/components/Header";
@@ -43,6 +43,7 @@ const LiveStream = () => {
   const [acceptedGuests, setAcceptedGuests] = useState<any[]>([]);
   const [focusedGuestId, setFocusedGuestId] = useState<string | null>(null);
   const [showGuestThumbnails, setShowGuestThumbnails] = useState(true);
+  const [guestRequestsEnabled, setGuestRequestsEnabled] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewerCount, setViewerCount] = useState(0);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -67,25 +68,17 @@ const LiveStream = () => {
   const { hearts, addHeart } = useFloatingHearts();
   const { emojis: floatingEmojis, broadcastEmoji: addEmoji } = useBroadcastEmojis(id ? `live-emojis-${id}` : null);
 
-  // Auto-fullscreen on mobile + re-enter if user exits
+  // Auto-fullscreen on mobile (only once on mount, don't re-enter)
+  const autoFullscreenDoneRef = useRef(false);
   useEffect(() => {
-    if (!isMobile || !videoContainerRef.current) return;
-    const tryFullscreen = () => {
+    if (!isMobile || !videoContainerRef.current || autoFullscreenDoneRef.current) return;
+    autoFullscreenDoneRef.current = true;
+    const timeout = setTimeout(() => {
       if (videoContainerRef.current && !document.fullscreenElement) {
         videoContainerRef.current.requestFullscreen?.().catch(() => {});
       }
-    };
-    const timeout = setTimeout(tryFullscreen, 1500);
-    const onFullscreenChange = () => {
-      if (isMobile && !document.fullscreenElement && videoContainerRef.current) {
-        setTimeout(tryFullscreen, 500);
-      }
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => {
-      clearTimeout(timeout);
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-    };
+    }, 1500);
+    return () => clearTimeout(timeout);
   }, [isMobile]);
 
   // Persistent channel for guest media state broadcasts
@@ -292,8 +285,11 @@ const LiveStream = () => {
     return () => { supabase.removeChannel(channel); };
   }, [id]);
 
+  // Auto-scroll chat to bottom WITHOUT scrolling the page
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   }, [chatMessages]);
 
   // Load join requests (for artist)
@@ -827,6 +823,8 @@ const LiveStream = () => {
                     <WebRTCHost
                       roomId={roomId}
                       hostId={currentUserId}
+                      avatarUrl={live?.artist_avatar}
+                      hostName={live?.artist_name}
                       streamType="live"
                       onStreamStart={async () => {
                         await supabase.from("artist_lives").update({ status: "live" }).eq("id", id);
@@ -871,6 +869,7 @@ const LiveStream = () => {
                       viewerId={currentUserId}
                       concertTitle={live.title || "Live en cours"}
                       artistName={live.artist_name}
+                      artistAvatarUrl={live.artist_avatar}
                     />
                     {focusedGuestId && (
                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5 z-10">
@@ -1010,14 +1009,25 @@ const LiveStream = () => {
                     onToggleMic: hostControls.handleToggleMic,
                     onSwitchCamera: hostControls.handleSwitchCamera,
                   } : undefined}
-                  guestManagementContent={
-                    <HostGuestControls
-                      liveId={id!}
-                      isHost={isArtist}
-                      currentUserId={currentUserId || ""}
-                      onKickGuest={() => toast({ title: t("guestKicked") })}
-                    />
-                  }
+                  guestManagementContent={isArtist ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">{t("guestControls")}</span>
+                        <Button size="sm" variant={guestRequestsEnabled ? "default" : "outline"} onClick={() => setGuestRequestsEnabled(prev => !prev)} className="gap-1.5 text-xs">
+                          {guestRequestsEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                          {guestRequestsEnabled ? t("guestRequestsOn") : t("guestRequestsOff")}
+                        </Button>
+                      </div>
+                      {guestRequestsEnabled && (
+                        <HostGuestControls
+                          liveId={id!}
+                          isHost={isArtist}
+                          currentUserId={currentUserId || ""}
+                          onKickGuest={() => toast({ title: t("guestKicked") })}
+                        />
+                      )}
+                    </div>
+                  ) : undefined}
                   activeGuestCount={acceptedGuests.length}
                   pendingGuestCount={joinRequests.length}
                   isGuest={isGuest}
@@ -1044,6 +1054,9 @@ const LiveStream = () => {
                   } : undefined}
                   description={live.title || "Live spontané"}
                   onQuitLive={() => navigate("/lives")}
+                  rightTopContent={
+                    <ShareButton contentType="live" contentId={id!} title={live.title || "Live"} variant="overlay" />
+                  }
                   focusedParticipantInfo={focusedGuestId ? (() => {
                     const guest = acceptedGuests.find(g => g.user_id === focusedGuestId);
                     if (!guest) return null;
@@ -1188,14 +1201,25 @@ const LiveStream = () => {
                 {/* Artist: Host guest controls */}
                 {isArtist && currentUserId && (
                   <div className="mt-4 space-y-3">
-                    <HostGuestControls
-                      liveId={id!}
-                      isHost={isArtist}
-                      currentUserId={currentUserId}
-                       onKickGuest={(requestId) => {
-                         toast({ title: t("guestKicked") });
-                      }}
-                    />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium flex items-center gap-2">
+                        <UserPlus className="w-4 h-4" /> {t("guestControls")}
+                      </span>
+                      <Button size="sm" variant={guestRequestsEnabled ? "default" : "outline"} onClick={() => setGuestRequestsEnabled(prev => !prev)} className="gap-1.5 text-xs">
+                        {guestRequestsEnabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                        {guestRequestsEnabled ? t("guestRequestsOn") : t("guestRequestsOff")}
+                      </Button>
+                    </div>
+                    {guestRequestsEnabled && (
+                      <HostGuestControls
+                        liveId={id!}
+                        isHost={isArtist}
+                        currentUserId={currentUserId}
+                        onKickGuest={(requestId) => {
+                          toast({ title: t("guestKicked") });
+                        }}
+                      />
+                    )}
                   </div>
                 )}
               </CardContent>

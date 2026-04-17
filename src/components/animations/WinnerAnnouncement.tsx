@@ -2,19 +2,23 @@ import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface WinnerAnnouncementProps {
   winnerName: string;
   winnerAvatar: string | null;
   winnerVotes: number;
   onStop: () => void;
+  /** Only managers can dismiss the animation */
+  canDismiss?: boolean;
 }
 
 const applauseUrl = "https://assets.mixkit.co/active_storage/sfx/2434/2434-preview.mp3";
 
-export const WinnerAnnouncement = ({ winnerName, winnerAvatar, winnerVotes, onStop }: WinnerAnnouncementProps) => {
+export const WinnerAnnouncement = ({ winnerName, winnerAvatar, winnerVotes, onStop, canDismiss = true }: WinnerAnnouncementProps) => {
   const [show, setShow] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const audio = new Audio(applauseUrl);
@@ -131,16 +135,18 @@ export const WinnerAnnouncement = ({ winnerName, winnerAvatar, winnerVotes, onSt
             <p className="text-5xl md:text-6xl font-black text-yellow-500">{winnerVotes}</p>
           </motion.div>
 
-          {/* Stop button */}
-          <motion.button
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 2 }}
-            onClick={() => { setShow(false); onStop(); }}
-            className="mt-6 px-6 py-2 bg-destructive text-destructive-foreground rounded-full font-semibold hover:bg-destructive/80 transition-colors pointer-events-auto"
-          >
-            Arrêter l'animation
-          </motion.button>
+          {/* Stop button — only visible for manager */}
+          {canDismiss && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 2 }}
+              onClick={() => { setShow(false); onStop(); }}
+              className="mt-6 px-6 py-2 bg-destructive text-destructive-foreground rounded-full font-semibold hover:bg-destructive/80 transition-colors pointer-events-auto"
+            >
+              {t("stopAnimation") || "Arrêter l'animation"}
+            </motion.button>
+          )}
         </motion.div>
 
         {/* Sparkle explosion */}

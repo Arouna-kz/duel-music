@@ -1,3 +1,5 @@
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -6,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Zap, Crown, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useSubscriptionPlans, type SubscriptionPlan } from "@/hooks/useSubscription";
+import { usePricingEnabled } from "@/hooks/usePlatformConfig";
 
 const getIcon = (icon: string) => {
   switch (icon) {
@@ -17,7 +20,15 @@ const getIcon = (icon: string) => {
 
 const Pricing = () => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const { data: plans, isLoading } = useSubscriptionPlans();
+  const { data: pricingEnabled, isLoading: pricingLoading } = usePricingEnabled();
+
+  useEffect(() => {
+    if (!pricingLoading && pricingEnabled === false) {
+      navigate("/", { replace: true });
+    }
+  }, [pricingEnabled, pricingLoading, navigate]);
 
   const creditPacks = [
     { credits: 100, price: "4.99€", bonus: "" },

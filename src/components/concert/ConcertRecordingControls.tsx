@@ -122,7 +122,9 @@ export const ConcertRecordingControls = ({
 
       toast({
         title: "Enregistrement sauvegardé",
-        description: isDuel ? "Le replay du duel est maintenant disponible" : "Le replay du concert est maintenant disponible",
+        description: isDuel
+          ? "La sauvegarde du duel s'est bien passée."
+          : "La sauvegarde du concert s'est bien passée.",
       });
     } catch (error: any) {
       console.error("Error saving replay URL:", error);
@@ -141,7 +143,9 @@ export const ConcertRecordingControls = ({
     if (started) {
       toast({
         title: "Enregistrement démarré",
-        description: "Le concert est en cours d'enregistrement pour le replay",
+        description: isDuel
+          ? "Le duel est en cours d'enregistrement pour le replay"
+          : "Le concert est en cours d'enregistrement pour le replay",
       });
     } else {
       toast({

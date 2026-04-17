@@ -107,7 +107,9 @@ export const HostGuestControls = ({ liveId, isHost, currentUserId, onKickGuest }
   };
 
   const kickGuest = async (guest: Guest) => {
-    await supabase.from("live_join_requests").update({ status: "ended", ended_at: new Date().toISOString() }).eq("id", guest.id);
+    // Hard-delete the join request so the user returns to the initial state
+    // and can submit a fresh request to rejoin if the artist allows.
+    await supabase.from("live_join_requests").delete().eq("id", guest.id);
     controlsChannelRef.current?.send({ type: "broadcast", event: "guest_action", payload: { action: "kick", targetUserId: guest.user_id } });
     onKickGuest?.(guest.id);
     toast({ title: `${guest.user_name} ${t("removedFromLive")}` });

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Music2, Menu, Moon, Sun, User, Gift, ChevronDown, Download } from "lucide-react";
+import { Menu, Moon, Sun, User, Gift, ChevronDown, Download, Wallet, Eye, EyeOff } from "lucide-react";
+import logoImg from "@/assets/logo-tr.png";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
@@ -16,6 +17,8 @@ import {
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [showBalance, setShowBalance] = useState(true);
   const { theme, setTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const location = useLocation();
@@ -32,6 +35,36 @@ const Header = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Load wallet balance
+  useEffect(() => {
+    if (!user) { setWalletBalance(null); return; }
+    const loadBalance = async () => {
+      const { data } = await supabase.from("user_wallets").select("balance").eq("user_id", user.id).maybeSingle();
+      setWalletBalance(data?.balance ?? 0);
+    };
+    loadBalance();
+    // Realtime wallet updates
+    const channel = supabase
+      .channel(`wallet-header-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_wallets", filter: `user_id=eq.${user.id}` }, (payload: any) => {
+        setWalletBalance(payload.new?.balance ?? 0);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  // Load show/hide preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("showWalletBalance");
+    if (saved !== null) setShowBalance(saved === "true");
+  }, []);
+
+  const toggleBalanceVisibility = () => {
+    const next = !showBalance;
+    setShowBalance(next);
+    localStorage.setItem("showWalletBalance", String(next));
+  };
+
   const navLinks = [
     { to: "/duels", label: t("duels") },
     { to: "/lives", label: t("lives") },
@@ -40,7 +73,6 @@ const Header = () => {
   ];
 
   const moreLinks = [
-    { to: "/replays", label: t("replays") },
     { to: "/leaderboard", label: t("leaderboard") },
     { to: "/artists", label: t("artists") },
   ];
@@ -56,17 +88,30 @@ const Header = () => {
   const langFlag = language === "fr" ? "🇫🇷" : "🇬🇧";
   const langLabel = language === "fr" ? "FR" : "EN";
 
+  const WalletDisplay = ({ className = "" }: { className?: string }) => {
+    if (!user || walletBalance === null) return null;
+    return (
+      <div className={`flex items-center gap-1 ${className}`}>
+        <Link to="/wallet" className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
+          <Wallet className="w-4 h-4 text-primary" />
+          {showBalance ? (
+            <span className="text-xs font-bold text-primary">{walletBalance}</span>
+          ) : (
+            <span className="text-xs font-bold text-primary">•••</span>
+          )}
+        </Link>
+        <button onClick={toggleBalanceVisibility} className="p-1 rounded-full hover:bg-muted transition-colors">
+          {showBalance ? <EyeOff className="w-3 h-3 text-muted-foreground" /> : <Eye className="w-3 h-3 text-muted-foreground" />}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <div className="relative">
-            <Music2 className="w-8 h-8 text-primary transition-transform group-hover:scale-110" />
-            <div className="absolute inset-0 blur-lg bg-primary/30 group-hover:bg-primary/50 transition-all" />
-          </div>
-          <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Duel Music
-          </span>
+        <Link to="/" className="flex items-center group">
+          <img src={logoImg} alt="Duel Music" className="h-10 transition-transform group-hover:scale-105" />
         </Link>
 
         {/* Desktop nav */}
@@ -107,6 +152,8 @@ const Header = () => {
         </div>
 
         <div className="hidden md:flex items-center gap-2">
+          <WalletDisplay />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="text-foreground gap-1 px-2">
@@ -156,14 +203,24 @@ const Header = () => {
           )}
         </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          <Menu className="w-6 h-6" />
-        </Button>
+        <div className="flex md:hidden items-center gap-1">
+          {user && <WalletDisplay />}
+          {user && (
+            <Link to="/gift-shop">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Gift className="w-5 h-5 text-primary" />
+              </Button>
+            </Link>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+          >
+            <Menu className="w-6 h-6" />
+          </Button>
+        </div>
       </nav>
 
       {/* Mobile menu */}

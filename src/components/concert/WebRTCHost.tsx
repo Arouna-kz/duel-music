@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useWebRTCSignaling } from "@/hooks/useWebRTCSignaling";
+import { useLiveKit } from "@/hooks/useLiveKit";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Video, VideoOff, Mic, MicOff, Radio, Users, Pause, Play, Wifi, WifiOff, SwitchCamera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -23,6 +24,8 @@ export interface WebRTCHostControls {
 interface WebRTCHostProps {
   roomId: string;
   hostId: string;
+  avatarUrl?: string | null;
+  hostName?: string;
   onStreamStart?: () => void;
   onStreamStop?: () => void;
   onStreamPause?: () => void;
@@ -41,6 +44,8 @@ interface WebRTCHostProps {
 export const WebRTCHost = ({
   roomId,
   hostId,
+  avatarUrl,
+  hostName,
   onStreamStart,
   onStreamStop,
   onStreamPause,
@@ -72,12 +77,11 @@ export const WebRTCHost = ({
     toggleVideo,
     toggleAudio,
     switchCamera,
-  } = useWebRTCSignaling({
-    roomId,
+  } = useLiveKit({
+    roomName: roomId,
     userId: hostId,
     isHost: true,
     onPeerJoin: (peerId) => {
-      // Only notify once per peer
       if (!notifiedPeersRef.current.has(peerId)) {
         notifiedPeersRef.current.add(peerId);
         console.log("New viewer joined:", peerId);
@@ -92,7 +96,7 @@ export const WebRTCHost = ({
       console.log("Viewer left:", peerId);
     },
     onError: (error) => {
-      console.error("WebRTC error:", error);
+      console.error("LiveKit error:", error);
       toast({
         title: "Erreur de connexion",
         description: error,
@@ -116,9 +120,21 @@ export const WebRTCHost = ({
   }, [localStream, onStreamReady]);
 
   const startStreaming = useCallback(async () => {
-    const stream = await startLocalStream(true, true);
-    if (stream) {
+    try {
+      // 1. Connect to the room FIRST
       await joinRoom();
+      
+      // 2. THEN start local stream (which will publish tracks since room is now connected)
+      const stream = await startLocalStream(true, true);
+      if (!stream) {
+        toast({
+          title: "Erreur",
+          description: "Impossible d'accéder à la caméra/microphone.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       setIsStreaming(true);
       setIsCameraOn(true);
       setIsMicOn(true);
@@ -126,6 +142,13 @@ export const WebRTCHost = ({
       toast({
         title: streamType === "live" ? "Live démarré" : "Concert démarré",
         description: "Vous êtes maintenant en direct!",
+      });
+    } catch (err) {
+      console.error("Failed to start streaming:", err);
+      toast({
+        title: "Erreur",
+        description: "Impossible de démarrer le streaming. Vérifiez votre connexion.",
+        variant: "destructive",
       });
     }
   }, [startLocalStream, joinRoom, onStreamStart, toast, streamType]);
@@ -224,6 +247,22 @@ export const WebRTCHost = ({
             <Pause className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
             <p className="text-white text-xl font-bold">{streamType === "live" ? t("livePaused") : t("concertPaused")}</p>
             <p className="text-white/70">{t("viewersSeeingPause")}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Camera off overlay — show avatar instead of black screen */}
+      {isStreaming && !isPaused && !isCameraOn && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted to-muted/80">
+          <div className="text-center">
+            <Avatar className="w-24 h-24 mx-auto mb-3 border-2 border-border">
+              <AvatarImage src={avatarUrl || ""} />
+              <AvatarFallback className="text-2xl">{hostName?.charAt(0) || "?"}</AvatarFallback>
+            </Avatar>
+            {hostName && <p className="text-foreground text-sm font-medium">{hostName}</p>}
+            <p className="text-muted-foreground text-xs mt-1">
+              <VideoOff className="w-3 h-3 inline mr-1" />Caméra désactivée
+            </p>
           </div>
         </div>
       )}

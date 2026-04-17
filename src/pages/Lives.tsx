@@ -32,6 +32,7 @@ const Lives = () => {
   const [startingLive, setStartingLive] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     const checkUser = async () => {
@@ -80,6 +81,35 @@ const Lives = () => {
   });
 
   const activeLives = lives?.filter(l => l.status === "live") || [];
+
+  // Presence-based viewer counts for active lives
+  useEffect(() => {
+    const liveIds = activeLives.map(l => l.id);
+    if (liveIds.length === 0) return;
+
+    const channels = liveIds.map(liveId => {
+      const channel = supabase.channel(`live-presence-list-${liveId}`, {
+        config: { presence: { key: crypto.randomUUID() } }
+      });
+      channel
+        .on("presence", { event: "sync" }, () => {
+          setViewerCounts(prev => ({
+            ...prev,
+            [liveId]: Object.keys(channel.presenceState()).length
+          }));
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel.track({ online_at: new Date().toISOString() });
+          }
+        });
+      return channel;
+    });
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [activeLives.map(l => l.id).join(",")]);
 
   const startLive = async () => {
     if (!currentUserId) return;
@@ -185,7 +215,7 @@ const Lives = () => {
                         <Badge className="bg-red-500 text-white animate-pulse">🔴 LIVE</Badge>
                       </div>
                       <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 text-white text-xs rounded-full px-2 py-1">
-                        <Users className="w-3 h-3" /> {live.viewer_count || 0}
+                        <Users className="w-3 h-3" /> {viewerCounts[live.id] || 0} {t("viewers")}
                       </div>
                     </div>
                     <CardContent className="p-4">

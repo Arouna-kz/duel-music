@@ -8,11 +8,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowLeft, Clock, Eye, Lock, Play } from "lucide-react";
+import { ArrowLeft, Clock, Eye, Lock, Play, Heart, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 import { toast } from "sonner";
 import { useEffect, useState, useRef } from "react";
+import CommentSection from "@/components/comments/CommentSection";
 
 const ReplayDetail = () => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,6 +23,11 @@ const ReplayDetail = () => {
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
   const dateLocale = language === "fr" ? fr : enUS;
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
+  }, []);
 
   const { data: replay, isLoading } = useQuery({
     queryKey: ["replay", id],
@@ -43,9 +49,57 @@ const ReplayDetail = () => {
     },
   });
 
+  // Likes
+  const { data: likesCount = 0 } = useQuery({
+    queryKey: ["replay-likes-count", id],
+    queryFn: async () => {
+      const { count } = await supabase.from("replay_likes").select("*", { count: "exact", head: true }).eq("replay_id", id);
+      return count || 0;
+    },
+  });
+
+  const { data: userLiked = false } = useQuery({
+    queryKey: ["replay-user-liked", id, currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return false;
+      const { data } = await supabase.from("replay_likes").select("id").eq("replay_id", id).eq("user_id", currentUserId).maybeSingle();
+      return !!data;
+    },
+    enabled: !!currentUserId,
+  });
+
+  const toggleLike = useMutation({
+    mutationFn: async () => {
+      if (!currentUserId) throw new Error("Not authenticated");
+      if (userLiked) {
+        await supabase.from("replay_likes").delete().eq("replay_id", id).eq("user_id", currentUserId);
+      } else {
+        await supabase.from("replay_likes").insert({ replay_id: id, user_id: currentUserId });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["replay-likes-count", id] });
+      queryClient.invalidateQueries({ queryKey: ["replay-user-liked", id, currentUserId] });
+    },
+  });
+
+  // Comments count
+  const { data: commentsCount = 0 } = useQuery({
+    queryKey: ["replay-comments-count", id],
+    queryFn: async () => {
+      const { count } = await supabase.from("comments").select("*", { count: "exact", head: true }).eq("content_id", id).eq("content_type", "replay");
+      return count || 0;
+    },
+  });
+
+  // Increment views once
+  const viewIncrementedRef = useRef(false);
   useEffect(() => {
-    if (replay && (!replay.is_premium || hasAccess)) {
-      supabase.from("replay_videos").update({ views_count: (replay.views_count || 0) + 1 }).eq("id", id);
+    if (replay && (!replay.is_premium || hasAccess) && !viewIncrementedRef.current) {
+      viewIncrementedRef.current = true;
+      supabase.rpc("increment_replay_views" as any, { p_replay_id: id }).then(() => {
+        queryClient.invalidateQueries({ queryKey: ["replay", id] });
+      });
     }
   }, [replay, hasAccess, id]);
 
@@ -99,7 +153,7 @@ const ReplayDetail = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
-        <Button variant="ghost" onClick={() => navigate("/replays")} className="mb-8">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-8">
           <ArrowLeft className="w-4 h-4 mr-2" />
           {t("back")}
         </Button>
@@ -144,6 +198,16 @@ const ReplayDetail = () => {
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-1"><Eye className="w-4 h-4" /><span>{formatCount(replay.views_count)} {t("views")}</span></div>
                 <span>•</span>
+                <button
+                  onClick={() => currentUserId ? toggleLike.mutate() : toast.error(t("loginRequired"))}
+                  className="flex items-center gap-1 hover:text-primary transition-colors"
+                >
+                  <Heart className={`w-4 h-4 ${userLiked ? "fill-red-500 text-red-500" : ""}`} />
+                  <span>{formatCount(likesCount)}</span>
+                </button>
+                <span>•</span>
+                <div className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /><span>{formatCount(commentsCount)}</span></div>
+                <span>•</span>
                 <span>{format(new Date(replay.recorded_date), "dd MMMM yyyy", { locale: dateLocale })}</span>
               </div>
             </div>
@@ -170,6 +234,14 @@ const ReplayDetail = () => {
             )}
           </div>
         </div>
+
+        {/* Comments section */}
+        {canWatch && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-bold mb-6">{t("comments")} ({commentsCount})</h2>
+            <CommentSection contentId={id!} contentType="replay" />
+          </div>
+        )}
       </main>
       <Footer />
     </div>

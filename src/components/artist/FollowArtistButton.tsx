@@ -61,15 +61,15 @@ export const FollowArtistButton = ({
       disabled={loading}
       className="gap-1"
     >
-      {isFollowing ? (
+    {isFollowing ? (
         <>
           <UserCheck className="w-3.5 h-3.5" />
-          {t("followingLabel") || "Suivi"}
+          {t("following")}
         </>
       ) : (
         <>
           <UserPlus className="w-3.5 h-3.5" />
-          {t("followLabel") || "Suivre"}
+          {t("follow")}
         </>
       )}
     </Button>

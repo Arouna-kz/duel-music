@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Flame, Users, Trophy, Calendar } from "lucide-react";
+import { Flame, Users, Trophy, Calendar, Play, Eye, Clock, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthRequiredDialog } from "@/components/auth/AuthRequiredDialog";
 
@@ -26,6 +26,7 @@ const Duels = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [duelReplays, setDuelReplays] = useState<any[]>([]);
 
   const fetchVotes = async (duelIds: string[], duelsData: any[]) => {
     if (duelIds.length === 0) return;
@@ -97,6 +98,16 @@ const Duels = () => {
           }
         }
       }
+      
+      // Fetch public duel replays
+      const { data: replayData } = await supabase
+        .from("replay_videos")
+        .select("*")
+        .eq("source_type", "duel")
+        .eq("is_public", true)
+        .order("recorded_date", { ascending: false });
+      setDuelReplays(replayData || []);
+
       setLoading(false);
     };
 
@@ -297,9 +308,9 @@ const Duels = () => {
                 <Calendar className="w-4 h-4" />
                 {t("tabUpcoming")} ({upcomingDuels.length})
               </TabsTrigger>
-              <TabsTrigger value="ended" className="flex items-center gap-2">
-                <Trophy className="w-4 h-4" />
-                {t("tabEnded")} ({endedDuels.length})
+              <TabsTrigger value="replays" className="flex items-center gap-2">
+                <Video className="w-4 h-4" />
+                {t("tabReplays")} ({duelReplays.length})
               </TabsTrigger>
             </TabsList>
 
@@ -309,8 +320,51 @@ const Duels = () => {
             <TabsContent value="upcoming">
               {renderDuelList(upcomingDuels, t("noDuelsUpcoming"))}
             </TabsContent>
-            <TabsContent value="ended">
-              {renderDuelList(endedDuels, t("noDuelsEnded"))}
+            <TabsContent value="replays">
+              {duelReplays.length === 0 ? (
+                <div className="text-center py-12">
+                  <Video className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">{t("noDuelReplays")}</p>
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {duelReplays.map((replay) => (
+                    <Card
+                      key={replay.id}
+                      className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden cursor-pointer"
+                      onClick={() => {
+                        if (!currentUserId) { setShowAuthDialog(true); return; }
+                        navigate(`/replay/${replay.id}`);
+                      }}
+                    >
+                      <div
+                        className="h-48 bg-cover bg-center relative"
+                        style={{
+                          backgroundImage: replay.thumbnail_url ? `url(${replay.thumbnail_url})` : 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))'
+                        }}
+                      >
+                        <div className="absolute inset-0 bg-background/40 group-hover:bg-background/20 transition-all flex items-center justify-center">
+                          <Play className="w-12 h-12 text-foreground opacity-90" />
+                        </div>
+                        <Badge className="absolute bottom-2 right-2 bg-background/80 text-foreground">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {replay.duration}
+                        </Badge>
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-bold text-lg mb-2 text-foreground">{replay.title}</h3>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Eye className="w-4 h-4" />
+                            <span>{replay.views_count || 0} {t("views")}</span>
+                          </div>
+                          <span>{new Date(replay.recorded_date).toLocaleDateString()}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         )}

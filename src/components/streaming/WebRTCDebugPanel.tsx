@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Bug, ChevronDown, ChevronUp, Wifi, WifiOff, Video, VideoOff, Mic, MicOff, RefreshCw } from "lucide-react";
-import { useWebRTCSignaling } from "@/hooks/useWebRTCSignaling";
+import { useLiveKit } from "@/hooks/useLiveKit";
 import { supabase } from "@/integrations/supabase/client";
 
 interface GuestDebugInfo {

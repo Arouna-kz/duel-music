@@ -8,7 +8,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Music2, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 
 interface AuthRequiredDialogProps {
   open: boolean;
@@ -24,7 +25,7 @@ export const AuthRequiredDialog = ({ open, onOpenChange }: AuthRequiredDialogPro
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader className="text-center items-center">
           <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center mx-auto mb-3">
-            <Music2 className="w-8 h-8 text-primary-foreground" />
+            <img src={logoImg} alt="Duel Music" className="w-8 h-8" />
           </div>
           <DialogTitle className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
             Rejoignez l'aventure !

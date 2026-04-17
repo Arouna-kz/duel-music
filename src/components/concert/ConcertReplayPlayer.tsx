@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Play, Pause, Volume2, VolumeX, Maximize, X, SkipBack, SkipForward } from "lucide-react";
@@ -29,91 +29,113 @@ export const ConcertReplayPlayer = ({ concert, open, onClose }: ConcertReplayPla
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Reset state when dialog opens/closes
   useEffect(() => {
-    if (open && videoRef.current) {
-      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    if (!open) {
+      setIsPlaying(false);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
     }
   }, [open]);
 
+  // Attach video event listeners when video element is available and dialog is open
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    if (!open) return;
 
-    const handleTimeUpdate = () => setCurrentTime(video.currentTime);
-    const handleLoadedMetadata = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-    const handleEnded = () => setIsPlaying(false);
+    // Small delay to let the dialog render the video element
+    const timer = setTimeout(() => {
+      const video = videoRef.current;
+      if (!video) return;
 
-    video.addEventListener("timeupdate", handleTimeUpdate);
-    video.addEventListener("loadedmetadata", handleLoadedMetadata);
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
-    video.addEventListener("ended", handleEnded);
+      const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+      const handleLoadedMetadata = () => setDuration(video.duration);
+      const handlePlay = () => setIsPlaying(true);
+      const handlePause = () => setIsPlaying(false);
+      const handleEnded = () => setIsPlaying(false);
 
-    return () => {
-      video.removeEventListener("timeupdate", handleTimeUpdate);
-      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      video.removeEventListener("play", handlePlay);
-      video.removeEventListener("pause", handlePause);
-      video.removeEventListener("ended", handleEnded);
-    };
-  }, []);
+      video.addEventListener("timeupdate", handleTimeUpdate);
+      video.addEventListener("loadedmetadata", handleLoadedMetadata);
+      video.addEventListener("play", handlePlay);
+      video.addEventListener("pause", handlePause);
+      video.addEventListener("ended", handleEnded);
 
-  const handleMouseMove = () => {
+      // Try autoplay
+      video.play().catch(() => {});
+
+      return () => {
+        video.removeEventListener("timeupdate", handleTimeUpdate);
+        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+        video.removeEventListener("play", handlePlay);
+        video.removeEventListener("pause", handlePause);
+        video.removeEventListener("ended", handleEnded);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [open, concert?.recording_url]);
+
+  const handleMouseMove = useCallback(() => {
     setShowControls(true);
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
     controlsTimeoutRef.current = setTimeout(() => {
-      if (isPlaying) setShowControls(false);
+      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
     }, 3000);
-  };
+  }, []);
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    if (isPlaying) {
-      videoRef.current.pause();
+  const togglePlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      video.play().catch(() => {});
     } else {
-      videoRef.current.play();
+      video.pause();
     }
-  };
+  }, []);
 
-  const toggleMute = () => {
-    if (!videoRef.current) return;
-    videoRef.current.muted = !isMuted;
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
     setIsMuted(!isMuted);
-  };
+  }, [isMuted]);
 
-  const handleVolumeChange = (value: number[]) => {
-    if (!videoRef.current) return;
+  const handleVolumeChange = useCallback((value: number[]) => {
+    const video = videoRef.current;
+    if (!video) return;
     const newVolume = value[0];
-    videoRef.current.volume = newVolume;
+    video.volume = newVolume;
     setVolume(newVolume);
     setIsMuted(newVolume === 0);
-  };
+  }, []);
 
-  const handleSeek = (value: number[]) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = value[0];
+  const handleSeek = useCallback((value: number[]) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = value[0];
     setCurrentTime(value[0]);
-  };
+  }, []);
 
-  const skip = (seconds: number) => {
-    if (!videoRef.current) return;
-    videoRef.current.currentTime = Math.max(0, Math.min(duration, currentTime + seconds));
-  };
+  const skip = useCallback((seconds: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = Math.max(0, Math.min(video.duration || 0, video.currentTime + seconds));
+  }, []);
 
-  const toggleFullscreen = () => {
-    if (!videoRef.current) return;
+  const toggleFullscreen = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      videoRef.current.requestFullscreen();
+      video.requestFullscreen();
     }
-  };
+  }, []);
 
   const formatTime = (time: number) => {
+    if (!time || !isFinite(time)) return "00:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
@@ -154,9 +176,10 @@ export const ConcertReplayPlayer = ({ concert, open, onClose }: ConcertReplayPla
             src={concert.recording_url}
             className="w-full h-full object-contain"
             poster={concert.image_url}
+            playsInline
           />
 
-          {/* Play/Pause overlay */}
+          {/* Play/Pause overlay - only show when paused */}
           {!isPlaying && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/30">
               <Button
@@ -178,7 +201,7 @@ export const ConcertReplayPlayer = ({ concert, open, onClose }: ConcertReplayPla
             {/* Progress bar */}
             <Slider
               value={[currentTime]}
-              max={duration || 100}
+              max={duration || 1}
               step={0.1}
               onValueChange={handleSeek}
               className="mb-4"

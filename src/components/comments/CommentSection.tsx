@@ -24,7 +24,7 @@ interface Comment {
 }
 
 interface CommentSectionProps {
-  contentType: "duel" | "live" | "lifestyle" | "blog";
+  contentType: "duel" | "live" | "lifestyle" | "blog" | "replay";
   contentId: string;
 }
 
@@ -152,6 +152,7 @@ const CommentSection = ({ contentType, contentId }: CommentSectionProps) => {
       });
 
     if (error) {
+      console.error("Comment insert error:", error);
       toast.error(t("commentError"));
     } else {
       setNewComment("");

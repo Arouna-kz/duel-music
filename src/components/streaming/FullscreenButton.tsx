@@ -23,10 +23,11 @@ export const FullscreenButton = ({ targetRef, className = "" }: FullscreenButton
     if (!targetRef.current) return;
 
     try {
-      if (!document.fullscreenElement) {
-        await targetRef.current.requestFullscreen();
-      } else {
+      if (document.fullscreenElement) {
+        // Always exit fullscreen when we're in fullscreen
         await document.exitFullscreen();
+      } else {
+        await targetRef.current.requestFullscreen();
       }
     } catch (err) {
       console.error("Fullscreen error:", err);
@@ -37,7 +38,10 @@ export const FullscreenButton = ({ targetRef, className = "" }: FullscreenButton
     <Button
       size="icon"
       variant="ghost"
-      onClick={toggleFullscreen}
+      onClick={(e) => {
+        e.stopPropagation();
+        toggleFullscreen();
+      }}
       className={`bg-black/50 hover:bg-black/70 text-white h-8 w-8 ${className}`}
       title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
     >

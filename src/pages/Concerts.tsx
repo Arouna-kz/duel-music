@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Calendar, MapPin, Ticket, Radio, Play, Video } from "lucide-react";
+import { Calendar, MapPin, Ticket, Radio, Play, Video, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -25,13 +25,14 @@ const Concerts = () => {
   const [showPlayer, setShowPlayer] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
+  const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
   }, []);
 
-  const { data: concerts, isLoading } = useQuery({
-    queryKey: ["all-concerts"],
+  const { data: concerts = [], isLoading: isConcertsLoading } = useQuery({
+    queryKey: ["all-concerts", language],
     queryFn: async () => {
       const { data: regularConcerts, error: regularError } = await supabase
         .from("concerts")
@@ -72,10 +73,74 @@ const Concerts = () => {
     },
   });
 
-  const liveConcerts = concerts?.filter(c => c.status === "live") || [];
-  const upcomingConcerts = concerts?.filter(c => c.status === "upcoming" || c.status === "scheduled") || [];
-  const pastConcerts = concerts?.filter(c => c.status === "ended") || [];
-  const replayConcerts = pastConcerts.filter(c => c.recording_url || c.is_replay_available);
+  const { data: publicReplayRows = [], isLoading: isReplayLoading } = useQuery({
+    queryKey: ["public-concert-replays"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("replay_videos")
+        .select("id, concert_id, title, thumbnail_url, video_url, recorded_date, replay_price")
+        .eq("source_type", "concert")
+        .eq("is_public", true)
+        .order("recorded_date", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const isLoading = isConcertsLoading || isReplayLoading;
+
+  const liveConcerts = concerts.filter(c => c.status === "live");
+
+  // Presence-based viewer counts for live concerts
+  useEffect(() => {
+    const liveIds = liveConcerts.map(c => c.id);
+    if (liveIds.length === 0) return;
+
+    const channels = liveIds.map(concertId => {
+      const channel = supabase.channel(`concert-presence-list-${concertId}`, {
+        config: { presence: { key: crypto.randomUUID() } }
+      });
+      channel
+        .on("presence", { event: "sync" }, () => {
+          setViewerCounts(prev => ({
+            ...prev,
+            [concertId]: Object.keys(channel.presenceState()).length
+          }));
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel.track({ online_at: new Date().toISOString() });
+          }
+        });
+      return channel;
+    });
+
+    return () => {
+      channels.forEach(ch => supabase.removeChannel(ch));
+    };
+  }, [liveConcerts.map(c => c.id).join(",")]);
+  const upcomingConcerts = concerts.filter(c => c.status === "upcoming" || c.status === "scheduled");
+  const concertById = new Map(concerts.map((concert) => [concert.id, concert]));
+  const replayConcerts = publicReplayRows
+    .map((replay) => {
+      if (!replay.video_url) return null;
+      const sourceConcert = replay.concert_id ? concertById.get(replay.concert_id) : undefined;
+
+      return {
+        ...(sourceConcert || {}),
+        id: replay.concert_id || replay.id,
+        replay_id: replay.id,
+        title: replay.title || sourceConcert?.title || "Concert",
+        artist_name: sourceConcert?.artist_name || t("artistDefault"),
+        scheduled_date: sourceConcert?.scheduled_date || replay.recorded_date,
+        ticket_price: replay.replay_price ?? sourceConcert?.ticket_price ?? 0,
+        image_url: replay.thumbnail_url || sourceConcert?.image_url,
+        recording_url: replay.video_url,
+        is_replay_available: true,
+      };
+    })
+    .filter(Boolean) as any[];
 
   const getStatusBadge = (concert: any) => {
     if (concert.status === "live") {
@@ -112,6 +177,12 @@ const Concerts = () => {
             <MapPin className="w-4 h-4" />
             <span className="text-sm">{concert.location}</span>
           </div>
+          {concert.status === "live" && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span className="text-sm">{viewerCounts[concert.id] || 0} {t("viewers")}</span>
+            </div>
+          )}
         </div>
         <Button className={`w-full ${concert.status === "live" ? "bg-red-500 hover:bg-red-600" : "bg-gradient-primary hover:shadow-glow"} transition-all`}>
           {concert.status === "live" ? t("watchLiveConcert") : t("buyTicket")}
@@ -141,14 +212,13 @@ const Concerts = () => {
           </div>
         ) : (
           <Tabs defaultValue={liveConcerts.length > 0 ? "live" : "upcoming"} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-8">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="live" className="relative">
-                {t("tabLive")}
+                {t("tabLive")} ({liveConcerts.length})
                 {liveConcerts.length > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
               </TabsTrigger>
-              <TabsTrigger value="upcoming">{t("tabUpcoming")}</TabsTrigger>
-              <TabsTrigger value="past">{t("tabPast")}</TabsTrigger>
-              <TabsTrigger value="replays" className="flex items-center gap-1"><Video className="w-4 h-4" />{t("tabReplays")}</TabsTrigger>
+              <TabsTrigger value="upcoming">{t("tabUpcoming")} ({upcomingConcerts.length})</TabsTrigger>
+              <TabsTrigger value="replays" className="flex items-center gap-1"><Video className="w-4 h-4" />{t("tabReplays")} ({replayConcerts.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="live">
@@ -167,13 +237,6 @@ const Concerts = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="past">
-              {pastConcerts.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{pastConcerts.map(c => <ConcertCard key={c.id} concert={c} />)}</div>
-              ) : (
-                <div className="text-center py-16"><Play className="w-16 h-16 mx-auto text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2">{t("noConcertsPast")}</h3></div>
-              )}
-            </TabsContent>
 
             <TabsContent value="replays">
               {replayConcerts.length > 0 ? (

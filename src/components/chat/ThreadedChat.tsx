@@ -221,7 +221,7 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
       <CardHeader className="py-3 border-b">
         <CardTitle className="text-lg flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-primary" />
-          {t("liveChat")}
+          {chatType === "concert" ? t("concertChat") : t("liveChat")}
           <span className="ml-auto" title={t("autoModeration")}>
             <Shield className="w-4 h-4 text-green-500" />
           </span>
@@ -246,10 +246,12 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   {msg.reply_to_name && (
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground mb-0.5 bg-muted/50 rounded px-1.5 py-0.5 w-fit">
-                      <Reply className="w-2.5 h-2.5" />
-                      <span className="font-semibold text-primary">{msg.reply_to_name}</span>
-                      <span className="truncate max-w-[120px]">{msg.reply_to_message}</span>
+                    <div className="mb-1 flex max-w-full items-start gap-1.5 rounded-md border-l-2 border-primary/70 bg-muted/60 px-2 py-1 text-[10px] text-muted-foreground">
+                      <Reply className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="block font-semibold leading-none text-primary">{msg.reply_to_name}</span>
+                        <span className="block max-w-[180px] truncate leading-tight">{msg.reply_to_message}</span>
+                      </div>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
@@ -283,11 +285,11 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
         </ScrollArea>
 
         {replyTo && (
-          <div className="mx-3 mb-1 bg-muted/50 border border-border rounded-lg px-3 py-1.5 flex items-center justify-between">
+          <div className="mx-3 mb-1 flex items-center justify-between rounded-lg border border-border bg-muted/60 px-3 py-2">
             <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
               <Reply className="w-3 h-3 text-primary shrink-0" />
               <span className="font-medium text-primary">{replyTo.user_name}</span>
-              <span className="truncate max-w-[150px]">{replyTo.message}</span>
+              <span className="truncate max-w-[220px]">{replyTo.message}</span>
             </div>
             <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0">
               <X className="w-3 h-3" />

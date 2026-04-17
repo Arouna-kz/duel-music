@@ -1538,6 +1538,35 @@ export type Database = {
           },
         ]
       }
+      replay_likes: {
+        Row: {
+          created_at: string
+          id: string
+          replay_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          replay_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          replay_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "replay_likes_replay_id_fkey"
+            columns: ["replay_id"]
+            isOneToOne: false
+            referencedRelation: "replay_videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       replay_videos: {
         Row: {
           artist_id: string | null
@@ -1977,6 +2006,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_replay_views: {
+        Args: { p_replay_id: string }
+        Returns: undefined
       }
       purchase_gift_from_wallet: {
         Args: { p_gift_id: string; p_quantity: number; p_user_id: string }

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Video, VideoOff, Mic, MicOff, Wifi, WifiOff, Loader2 } from "lucide-react";
-import { useWebRTCSignaling } from "@/hooks/useWebRTCSignaling";
+import { useLiveKit } from "@/hooks/useLiveKit";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -29,11 +29,11 @@ export const GuestDiagnosticBadge = ({ guestUserId, liveId, currentUserId }: Gue
     setHasAudio(stream.getAudioTracks().some(t => t.readyState === "live" && t.enabled && !t.muted));
   }, []);
 
-  const { remoteStreams, joinRoom, leaveRoom } = useWebRTCSignaling({
-    roomId: guestRoomId,
+  const { remoteStreams, joinRoom, leaveRoom } = useLiveKit({
+    roomName: guestRoomId,
     userId: `diag-${currentUserId}`,
     isHost: false,
-    onRemoteStream: (stream) => { streamRef.current = stream; setConnState("connected"); syncTracks(stream); },
+    onRemoteStream: (stream: MediaStream) => { streamRef.current = stream; setConnState("connected"); syncTracks(stream); },
     onPeerLeave: () => { streamRef.current = null; setConnState("disconnected"); setHasVideo(false); setHasAudio(false); },
   });
 
@@ -45,8 +45,8 @@ export const GuestDiagnosticBadge = ({ guestUserId, liveId, currentUserId }: Gue
 
   useEffect(() => {
     pollRef.current = setInterval(() => {
-      const streams = Array.from(remoteStreams.values());
-      const stream = streams[0] || streamRef.current;
+      const streams = Array.from(remoteStreams.values()) as MediaStream[];
+      const stream: MediaStream | null = streams[0] || streamRef.current;
       if (stream) {
         if (connState === "connecting") setConnState("connected");
         syncTracks(stream);
