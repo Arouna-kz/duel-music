@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SEO from "@/components/seo/SEO";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Gift, Wallet, ShoppingCart, Package, Minus, Plus } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useWallet } from "@/hooks/useWallet";
 
 interface VirtualGift {
   id: string;
@@ -31,7 +33,7 @@ const GiftShop = () => {
   const [loading, setLoading] = useState(true);
   const [gifts, setGifts] = useState<VirtualGift[]>([]);
   const [userGifts, setUserGifts] = useState<UserGift[]>([]);
-  const [walletBalance, setWalletBalance] = useState(0);
+  const { balance: walletBalance } = useWallet();
   const [purchasing, setPurchasing] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,13 +63,7 @@ const GiftShop = () => {
 
       if (userGiftsData) setUserGifts(userGiftsData);
 
-      const { data: wallet } = await supabase
-        .from("user_wallets")
-        .select("balance")
-        .eq("user_id", user.id)
-        .single();
-
-      if (wallet) setWalletBalance(Number(wallet.balance) || 0);
+      // wallet balance is live via useWallet()
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -100,9 +96,10 @@ const GiftShop = () => {
       });
 
       if (error || !success) {
+        const isInsufficient = walletBalance < totalCost;
         toast({
-          title: error ? t("error") : t("insufficientBalance"),
-          description: error ? t("purchaseError") : t("insufficientBalanceDesc"),
+          title: t(isInsufficient ? "purchaseErrInsufficientTitle" : "errorTitle"),
+          description: t(isInsufficient ? "purchaseErrInsufficient" : "purchaseErrGeneric"),
           variant: "destructive",
         });
         return;
@@ -145,6 +142,7 @@ const GiftShop = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO title="Boutique cadeaux virtuels — Duel Music" description="Offrez des cadeaux virtuels animés aux artistes lors des duels et concerts en direct." path="/gift-shop" />
       <Header />
       <main className="flex-1 pt-24 pb-12 px-4">
         <div className="container max-w-6xl mx-auto">
@@ -161,7 +159,7 @@ const GiftShop = () => {
             <Card className="p-4 flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-primary" />
-                <span className="text-2xl font-bold">{walletBalance.toFixed(2)}€</span>
+                <span className="text-2xl font-bold">${walletBalance.toFixed(2)}</span>
               </div>
               <Button onClick={() => navigate("/wallet")} variant="outline" size="sm">
                 {t("rechargeWallet")}
@@ -219,7 +217,7 @@ const GiftShop = () => {
                       )}
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-primary">{gift.price}€</span>
+                      <span className="text-2xl font-bold text-primary">${gift.price}</span>
                       <div className="flex items-center gap-2">
                         <Button
                           size="sm"

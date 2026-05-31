@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Instagram, Youtube, Twitter, Facebook, Music, Save, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
 
@@ -42,6 +43,7 @@ interface ArtistProfile {
 export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<ArtistProfile | null>(null);
@@ -166,7 +168,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
   };
 
   if (loading) {
-    return <div className="text-center py-8">Chargement du profil...</div>;
+    return <div className="text-center py-8">{t("artistProfileLoading")}</div>;
   }
 
   return (
@@ -176,15 +178,15 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
         <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="font-medium">Votre profil public est actif</p>
-              <p className="text-sm text-muted-foreground">Les fans peuvent voir votre profil</p>
+              <p className="font-medium">{t("artistPublicActiveTitle")}</p>
+              <p className="text-sm text-muted-foreground">{t("artistPublicActiveDesc")}</p>
             </div>
             <Button 
               onClick={() => navigate(`/artist/${userId}`)}
               className="bg-gradient-to-r from-purple-500 to-pink-500 text-white"
             >
               <Eye className="w-4 h-4 mr-2" />
-              Voir mon profil public
+              {t("artistPublicViewBtn")}
             </Button>
           </CardContent>
         </Card>
@@ -193,7 +195,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Profil Public Artiste
+            {t("artistFormCardTitle")}
             <div className="flex items-center gap-2">
               {formData.is_public ? (
                 <Eye className="w-4 h-4 text-green-500" />
@@ -205,39 +207,39 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
                 onCheckedChange={(checked) => setFormData({...formData, is_public: checked})}
               />
               <span className="text-sm text-muted-foreground">
-                {formData.is_public ? "Public" : "Privé"}
+                {formData.is_public ? t("artistFormPublic") : t("artistFormPrivate")}
               </span>
             </div>
           </CardTitle>
           <CardDescription>
-            Personnalisez votre profil visible par tous les fans
+            {t("artistFormCardDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <ImageUpload
             value={formData.cover_image_url}
             onChange={(url) => setFormData({...formData, cover_image_url: url})}
-            label="Image de couverture"
+            label={t("artistFormCoverLabel")}
             folder="artist-covers"
           />
 
           <div className="space-y-2">
-            <Label htmlFor="stage_name">Nom de scène</Label>
+            <Label htmlFor="stage_name">{t("artistFormStageName")}</Label>
             <Input
               id="stage_name"
               value={formData.stage_name}
               onChange={(e) => setFormData({...formData, stage_name: e.target.value})}
-              placeholder="Votre nom d'artiste"
+              placeholder={t("artistFormStageNamePh")}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Biographie</Label>
+            <Label htmlFor="bio">{t("artistFormBio")}</Label>
             <Textarea
               id="bio"
               value={formData.bio}
               onChange={(e) => setFormData({...formData, bio: e.target.value})}
-              placeholder="Parlez de vous, votre musique, votre parcours..."
+              placeholder={t("artistFormBioPh")}
               className="min-h-[150px]"
             />
           </div>
@@ -245,7 +247,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
           <div className="space-y-4">
             <Label className="flex items-center gap-2">
               <ExternalLink className="w-4 h-4" />
-              Réseaux Sociaux
+              {t("artistFormSocial")}
             </Label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
@@ -280,7 +282,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
                     ...formData,
                     social_links: {...formData.social_links, youtube: e.target.value}
                   })}
-                  placeholder="URL YouTube"
+                  placeholder={t("artistFormSocialYoutubePh")}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -291,7 +293,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
                     ...formData,
                     social_links: {...formData.social_links, spotify: e.target.value}
                   })}
-                  placeholder="URL Spotify"
+                  placeholder={t("artistFormSocialSpotifyPh")}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -313,7 +315,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
                     ...formData,
                     social_links: {...formData.social_links, facebook: e.target.value}
                   })}
-                  placeholder="URL Facebook"
+                  placeholder={t("artistFormSocialFacebookPh")}
                 />
               </div>
             </div>
@@ -321,7 +323,7 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
 
           <Button onClick={handleSave} disabled={saving} className="w-full">
             <Save className="w-4 h-4 mr-2" />
-            {saving ? "Enregistrement..." : "Enregistrer le profil"}
+            {saving ? t("artistFormSaving") : t("artistFormSave")}
           </Button>
         </CardContent>
       </Card>
@@ -329,20 +331,20 @@ export const ArtistPublicProfile = ({ userId }: ArtistPublicProfileProps) => {
       {profile && (
         <Card className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-purple-500/20">
           <CardHeader>
-            <CardTitle>Revenus</CardTitle>
+            <CardTitle>{t("artistFormRevenues")}</CardTitle>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 bg-background/50 rounded-lg">
               <p className="text-3xl font-bold text-purple-500">
-                {profile.total_earnings?.toFixed(2) || "0.00"} €
+                {profile.total_earnings?.toFixed(2) || "0.00"} $
               </p>
-              <p className="text-sm text-muted-foreground">Total des gains</p>
+              <p className="text-sm text-muted-foreground">{t("artistFormTotalEarnings")}</p>
             </div>
             <div className="text-center p-4 bg-background/50 rounded-lg">
               <p className="text-3xl font-bold text-green-500">
-                {profile.available_balance?.toFixed(2) || "0.00"} €
+                {profile.available_balance?.toFixed(2) || "0.00"} $
               </p>
-              <p className="text-sm text-muted-foreground">Solde disponible</p>
+              <p className="text-sm text-muted-foreground">{t("artistFormAvailableBalance")}</p>
             </div>
           </CardContent>
         </Card>

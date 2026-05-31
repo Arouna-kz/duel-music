@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Users, Gift, Save } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useQueryClient } from "@tanstack/react-query";
 import type { Json } from "@/integrations/supabase/types";
 
 interface ReferralConfig {
@@ -18,6 +19,7 @@ interface ReferralConfig {
 const ReferralConfigManager = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [config, setConfig] = useState<ReferralConfig>({ enabled: true, credits_per_referral: 50 });
   const [stats, setStats] = useState({ total: 0, completed: 0, totalCredits: 0 });
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,7 @@ const ReferralConfigManager = () => {
     if (error) {
       toast({ title: t("error"), description: error.message, variant: "destructive" });
     } else {
+      queryClient.invalidateQueries({ queryKey: ["referral-config-enabled"] });
       toast({ title: t("adminReferralSaved") });
     }
     setSaving(false);

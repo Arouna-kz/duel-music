@@ -1,39 +1,12 @@
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Play, Sparkles, Trophy } from "lucide-react";
+import { Play, Mic, Trophy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import heroBackground from "@/assets/hero-bg.jpg";
 import duelIcon from "@/assets/duel-icon.png";
-import { supabase } from "@/integrations/supabase/client";
 
 const Hero = () => {
   const { t } = useLanguage();
-  const [stats, setStats] = useState({ artists: 0, fans: 0, votes: 0 });
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      // Use a SECURITY DEFINER function to bypass RLS for accurate counts
-      const { data } = await supabase.rpc("get_platform_stats");
-
-      if (data) {
-        const stats = data as any;
-        setStats({
-          artists: stats.artists || 0,
-          fans: stats.fans || 0,
-          votes: stats.votes || 0,
-        });
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  const formatNumber = (num: number): string => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M+`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K+`;
-    return num.toString();
-  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -51,7 +24,7 @@ const Hero = () => {
       <div className="container mx-auto px-4 relative z-10 py-20">
         <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card/50 backdrop-blur-sm border border-primary/20 shadow-glow mb-6">
-            <Sparkles className="w-4 h-4 text-accent" />
+            <Mic className="w-4 h-4 text-accent" />
             <span className="text-sm text-foreground/80">{t("heroTitle")}</span>
           </div>
 
@@ -106,20 +79,6 @@ const Hero = () => {
             </Link>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-8 pt-12">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">{formatNumber(stats.artists)}</div>
-              <div className="text-sm text-muted-foreground">Artistes</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-accent">{formatNumber(stats.fans)}</div>
-              <div className="text-sm text-muted-foreground">Fans</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-electric-blue">{formatNumber(stats.votes)}</div>
-              <div className="text-sm text-muted-foreground">Votes</div>
-            </div>
-          </div>
         </div>
       </div>
     </section>

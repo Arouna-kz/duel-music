@@ -1,8 +1,10 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import ProfileHeader from "@/components/profile/ProfileHeader";
+import ProfileFooter from "@/components/profile/ProfileFooter";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +18,7 @@ import {
   Users, Music, Swords, Video, TrendingUp, UserCheck, Briefcase,
   DollarSign, CheckCircle, XCircle, Clock, Eye, Ban, Trash2,
   BarChart3, Radio, Shield, ExternalLink, CreditCard, Hash, Link2, StopCircle, ClipboardList,
-  Trophy, Gift, EyeOff, Settings
+  Trophy, Gift, EyeOff, Settings, Megaphone
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BlogManager } from "@/components/admin/BlogManager";
@@ -28,9 +30,29 @@ import AdminLogs from "@/components/admin/AdminLogs";
 import { SubscriptionPlansManager } from "@/components/admin/SubscriptionPlansManager";
 import LeaderboardSeasonsManager from "@/components/admin/LeaderboardSeasonsManager";
 import ReferralConfigManager from "@/components/admin/ReferralConfigManager";
+import AdminSponsorManager from "@/components/admin/AdminSponsorManager";
 import PlatformConfigManager from "@/components/admin/PlatformConfigManager";
 import LifestyleManager from "@/components/admin/LifestyleManager";
+import EconomicConfigManager from "@/components/admin/EconomicConfigManager";
+import GiftsVotesSettingsView from "@/components/admin/GiftsVotesSettingsView";
+import RevenueAnalytics from "@/components/admin/RevenueAnalytics";
+import TransactionsLedger from "@/components/admin/TransactionsLedger";
+import AdminAnnouncementsManager from "@/components/admin/AdminAnnouncementsManager";
+import ContactInfoManager from "@/components/admin/ContactInfoManager";
+import SocialLinksManager from "@/components/admin/SocialLinksManager";
+import PushConfigManager from "@/components/admin/PushConfigManager";
+import AdminDocumentsManager from "@/components/admin/AdminDocumentsManager";
+import AdminGiftsManager from "@/components/admin/AdminGiftsManager";
+import AdminConcertValidation from "@/components/admin/AdminConcertValidation";
+import AdminDedicationsManager from "@/components/admin/AdminDedicationsManager";
+import CinetPayAdminPanel from "@/components/admin/CinetPayAdminPanel";
+import PreferencesPanel from "@/components/profile/PreferencesPanel";
+import TransactionsPanel from "@/components/profile/TransactionsPanel";
+import { WithdrawalPinGate } from "@/components/profile/WithdrawalPinGate";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getUiPrefs } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
+import { useCurrencyFormatter } from "@/hooks/useCurrency";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface ArtistRequest {
@@ -73,8 +95,12 @@ interface DuelRow {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const fmt = (dt: string | null) =>
-  dt ? new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+const fmt = (dt: string | null) => {
+  if (!dt) return "—";
+  // Use stored language at format time (best-effort outside React tree)
+  const lang = (typeof document !== "undefined" && document.documentElement.lang === "en") ? "en" : "fr";
+  return formatTz(dt, "dd MMM yyyy HH:mm", { timezone: getUiPrefs().timezone, language: lang as "fr" | "en" });
+};
 
 const createStatusBadge = (t: (key: string) => string) => (status: string) => {
   switch (status) {
@@ -149,16 +175,17 @@ const InfoRow = ({ label, children }: { label: string; children: React.ReactNode
 
 // ─── Duel Request Row ─────────────────────────────────────────────────────────
 const DuelRequestRow = ({
-  request, managers, onApprove, onReject, getStatusBadge
+  request, managers, adminUserId, onApprove, onReject, getStatusBadge
 }: {
-  request: DuelRequest; managers: Manager[];
-  onApprove: (managerId: string, scheduledDate?: string, ticketPrice?: number) => void;
+  request: DuelRequest; managers: Manager[]; adminUserId?: string | null;
+  onApprove: (managerId: string, scheduledDate?: string, ticketPrice?: number, allowsSponsorAds?: boolean) => void;
   onReject: () => void;
   getStatusBadge: (s: string) => JSX.Element;
 }) => {
   const [selectedManager, setSelectedManager] = useState<string>(request.manager_id || "");
   const [scheduledDate, setScheduledDate] = useState<string>(request.proposed_date || "");
   const [ticketPrice, setTicketPrice] = useState<number>(0);
+  const [allowsSponsorAds, setAllowsSponsorAds] = useState<boolean>(true);
   const [isEditingDate, setIsEditingDate] = useState(false);
   const { toast } = useToast();
 
@@ -209,8 +236,11 @@ const DuelRequestRow = ({
       <td className="p-4">
         {canApprove ? (
           <Select value={selectedManager} onValueChange={setSelectedManager}>
-            <SelectTrigger className="w-[180px]"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+            <SelectTrigger className="w-[200px]"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
             <SelectContent>
+              {adminUserId && (
+                <SelectItem value={adminUserId}>👑 Admin (moi) — joue le rôle de manager</SelectItem>
+              )}
               {managers.map((m) => <SelectItem key={m.id} value={m.user_id}>{m.display_name || "Manager"}</SelectItem>)}
             </SelectContent>
           </Select>
@@ -229,12 +259,21 @@ const DuelRequestRow = ({
                 value={ticketPrice}
                 onChange={(e) => setTicketPrice(Number(e.target.value))}
                 className="w-[100px]"
-                placeholder="Prix €"
+                placeholder="Prix $"
               />
-              <span className="text-xs text-muted-foreground">{ticketPrice === 0 ? "Gratuit" : `${ticketPrice} €`}</span>
+              <span className="text-xs text-muted-foreground">{ticketPrice === 0 ? "Gratuit" : `${ticketPrice} $`}</span>
             </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={allowsSponsorAds}
+                onChange={(e) => setAllowsSponsorAds(e.target.checked)}
+                className="h-3.5 w-3.5"
+              />
+              Autoriser les publicités sponsor
+            </label>
             <div className="flex gap-2">
-              <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => onApprove(selectedManager, scheduledDate, ticketPrice)} disabled={!selectedManager || !scheduledDate}>
+              <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => onApprove(selectedManager, scheduledDate, ticketPrice, allowsSponsorAds)} disabled={!selectedManager || !scheduledDate}>
                 <CheckCircle className="w-4 h-4" />
               </Button>
               <Button size="sm" variant="destructive" onClick={onReject}><XCircle className="w-4 h-4" /></Button>
@@ -257,6 +296,7 @@ const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { formatPrice, formatCreditsLabel } = useCurrencyFormatter();
   const statusBadge = createStatusBadge(t);
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [loading, setLoading] = useState(true);
@@ -272,14 +312,52 @@ const Admin = () => {
   const [managerRequests, setManagerRequests] = useState<ManagerRequest[]>([]);
   const [duelRequests, setDuelRequests] = useState<DuelRequest[]>([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState<WithdrawalRequest[]>([]);
+  const [approvalRequest, setApprovalRequest] = useState<WithdrawalRequest | null>(null);
+  const [approvalProvider, setApprovalProvider] = useState<string>("cinetpay");
+  const [approvalSubmitting, setApprovalSubmitting] = useState(false);
+  const [providersCfg, setProvidersCfg] = useState<Record<string, { enabled: boolean; min_amount_credits: number; mode: string }>>({});
   const [managers, setManagers] = useState<Manager[]>([]);
   const [artistProfileIds, setArtistProfileIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    supabase.from("platform_settings").select("value").eq("key", "withdrawal_providers_config").maybeSingle()
+      .then(({ data }) => { if (data?.value) setProvidersCfg(data.value as any); });
+  }, []);
 
   const [stats, setStats] = useState({
     totalUsers: 0, totalConcerts: 0, totalDuels: 0, totalReplays: 0,
     pendingArtistRequests: 0, pendingManagerRequests: 0, pendingDuelRequests: 0,
     pendingWithdrawals: 0, activeLives: 0,
   });
+
+  // Sidebar navigation state — synced with URL ?tab=
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || "stats";
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tab !== activeTab) setActiveTab(tab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleSidebarSelect = (v: string) => {
+    if (v === "profile") {
+      navigate("/profile");
+      return;
+    }
+    if (v === "transactions") {
+      navigate("/transactions");
+      return;
+    }
+    if (v === "followed") {
+      navigate("/profile?tab=followed");
+      return;
+    }
+    setActiveTab(v);
+    setSearchParams({ tab: v }, { replace: true });
+  };
 
   // Ref to hold current admin info without re-renders
   const adminRef = useRef<{ id: string; name: string } | null>(null);
@@ -497,7 +575,7 @@ const Admin = () => {
     }
   };
 
-  const handleDuelRequest = async (requestId: string, status: "approved" | "rejected", managerId?: string, scheduledDate?: string, ticketPrice?: number) => {
+  const handleDuelRequest = async (requestId: string, status: "approved" | "rejected", managerId?: string, scheduledDate?: string, ticketPrice?: number, allowsSponsorAds?: boolean) => {
     const duelReq = duelRequests.find(r => r.id === requestId);
     try {
       if (status === "approved" && !managerId) {
@@ -513,16 +591,17 @@ const Admin = () => {
           artist1_id: duelReq.requester_id, artist2_id: duelReq.opponent_id,
           manager_id: managerId, scheduled_time: finalDate, status: "upcoming",
           ticket_price: finalPrice,
-        }).select().single();
+          allows_sponsor_ads: allowsSponsorAds ?? true,
+        } as any).select().single();
         if (duelError) throw duelError;
         const notifications = [
-          { user_id: duelReq.requester_id, type: "duel_approved", title: "Votre duel a été approuvé!", message: `Votre duel contre ${duelReq.opponent_name} a été validé.${finalPrice > 0 ? ` Prix d'entrée: ${finalPrice}€` : " Accès gratuit."}`, data: { duel_id: newDuel.id } },
+          { user_id: duelReq.requester_id, type: "duel_approved", title: "Votre duel a été approuvé!", message: `Votre duel contre ${duelReq.opponent_name} a été validé.${finalPrice > 0 ? ` Prix d'entrée: ${finalPrice}` : " Accès gratuit."}`, data: { duel_id: newDuel.id } },
           { user_id: duelReq.opponent_id, type: "duel_approved", title: "Duel confirmé!", message: `Un duel contre ${duelReq.requester_name} a été programmé.`, data: { duel_id: newDuel.id } },
         ];
         if (managerId) notifications.push({ user_id: managerId, type: "duel_assigned", title: "Nouveau duel à gérer", message: `Vous gérez le duel ${duelReq.requester_name} vs ${duelReq.opponent_name}.`, data: { duel_id: newDuel.id } });
         await supabase.from("notifications").insert(notifications);
       }
-      await logAdminAction(`${status}_duel`, "duel_request", requestId, `${duelReq?.requester_name} vs ${duelReq?.opponent_name}`, { status, manager_id: managerId, ticket_price: ticketPrice });
+      await logAdminAction(`${status}_duel`, "duel_request", requestId, `${duelReq?.requester_name} vs ${duelReq?.opponent_name}`, { status, manager_id: managerId, ticket_price: ticketPrice, allows_sponsor_ads: allowsSponsorAds });
       toast({ title: status === "approved" ? t("adminDuelValidated") : t("adminRequestRejected") });
       await loadDashboardData();
     } catch (error: any) {
@@ -532,6 +611,12 @@ const Admin = () => {
 
   const handleWithdrawalRequest = async (requestId: string, status: "completed" | "rejected") => {
     const withdrawal = withdrawalRequests.find(r => r.id === requestId);
+    if (status === "completed") {
+      // Ouvre le sélecteur de provider — le traitement réel se fait dans handleApproveWithProvider.
+      setApprovalRequest(withdrawal ?? null);
+      setApprovalProvider("cinetpay");
+      return;
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from("withdrawal_requests").update({ status, processed_at: new Date().toISOString(), processed_by: user?.id }).eq("id", requestId);
@@ -539,10 +624,38 @@ const Admin = () => {
         await sendStatusNotification(withdrawal.user_id, "withdrawal", status, withdrawal.amount);
         await logAdminAction(`${status}_withdrawal`, "withdrawal", requestId, withdrawal.user_name, { status, amount: withdrawal.amount });
       }
-      toast({ title: status === "completed" ? t("adminWithdrawalDone") : t("adminWithdrawalRejected") });
+      toast({ title: t("adminWithdrawalRejected") });
       await loadDashboardData();
     } catch (error: any) {
       toast({ title: t("error"), description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleApproveWithProvider = async () => {
+    if (!approvalRequest) return;
+    setApprovalSubmitting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("process-withdrawal", {
+        body: { withdrawal_request_id: approvalRequest.id, provider: approvalProvider },
+      });
+      const res = data as any;
+      if (error || res?.error) {
+        const msg = res?.error || error?.message || "Erreur";
+        toast({ title: t("error"), description: typeof msg === "string" ? msg : JSON.stringify(msg), variant: "destructive" });
+        setApprovalSubmitting(false);
+        return;
+      }
+      await sendStatusNotification(approvalRequest.user_id, "withdrawal", "completed", approvalRequest.amount);
+      await logAdminAction("approve_withdrawal", "withdrawal", approvalRequest.id, approvalRequest.user_name, {
+        amount: approvalRequest.amount, provider: approvalProvider,
+      });
+      toast({ title: t("adminWithdrawalDone"), description: `Provider: ${approvalProvider}` });
+      setApprovalRequest(null);
+      await loadDashboardData();
+    } catch (e: any) {
+      toast({ title: t("error"), description: e.message, variant: "destructive" });
+    } finally {
+      setApprovalSubmitting(false);
     }
   };
 
@@ -779,43 +892,100 @@ const Admin = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       {confirmDialog}
-      <Header />
-      <main className="flex-1 pt-24 pb-12 px-4">
-        <div className="container max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold mb-2">{t("adminDashTitle")}</h1>
-            <p className="text-muted-foreground">{t("adminDashSubtitle")}</p>
-          </div>
+      <Dialog open={!!approvalRequest} onOpenChange={(o) => !o && setApprovalRequest(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("adminApproveWithdrawalTitle") || "Approuver le retrait"}</DialogTitle>
+          </DialogHeader>
+          {approvalRequest && (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+                <div><span className="text-muted-foreground">{t("adminColUser") || "Utilisateur"} :</span> <span className="font-medium">{approvalRequest.user_name}</span></div>
+                <div><span className="text-muted-foreground">{t("adminPaymentAmount") || "Montant"} :</span> <span className="font-bold text-green-500">{Number(approvalRequest.amount).toLocaleString()} Crédits</span></div>
+                <div className="text-xs text-muted-foreground">{approvalRequest.payment_method} • {(approvalRequest.payment_details as any)?.phone_number || (approvalRequest.payment_details as any)?.iban || (approvalRequest.payment_details as any)?.paypal_email || "—"}</div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-2 block">{t("adminApproveProviderLabel") || "Choisir le compte de paiement"}</label>
+                <Select value={approvalProvider} onValueChange={setApprovalProvider}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {providersCfg.cinetpay?.enabled !== false && <SelectItem value="cinetpay">CinetPay (Mobile Money)</SelectItem>}
+                    {providersCfg.moneroo?.enabled !== false && <SelectItem value="moneroo">Moneroo (Mobile Money)</SelectItem>}
+                    {providersCfg.stripe?.enabled !== false && <SelectItem value="stripe">Stripe (Carte — manuel)</SelectItem>}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {approvalProvider === "stripe"
+                    ? (t("adminApproveStripeNote") || "Stripe : la demande sera marquée comme payée. Le virement réel doit être effectué manuellement depuis ton tableau Stripe.")
+                    : (t("adminApproveAutoNote") || "Le payout est déclenché automatiquement vers la coordonnée du demandeur.")}
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button variant="outline" onClick={() => setApprovalRequest(null)} disabled={approvalSubmitting}>{t("cancel") || "Annuler"}</Button>
+                <Button onClick={handleApproveWithProvider} disabled={approvalSubmitting} className="bg-green-500 hover:bg-green-600">
+                  {approvalSubmitting ? (t("loading") || "Traitement...") : (t("adminApproveConfirm") || "Confirmer & payer")}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      <ProfileHeader primaryRole="admin" showMenuButton onMenuToggle={() => setSidebarOpen(true)} />
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3 mb-8">
-            {[
-              { label: t("adminUsers"), value: stats.totalUsers, icon: Users, color: "" },
-              { label: t("adminConcerts"), value: stats.totalConcerts, icon: Music, color: "" },
-              { label: t("adminDuels"), value: stats.totalDuels, icon: Swords, color: "" },
-              { label: t("adminReplays"), value: stats.totalReplays, icon: Video, color: "" },
-              { label: t("adminActiveLives"), value: stats.activeLives, icon: Radio, color: "text-red-500 border-red-500/50" },
-              { label: t("adminArtists"), value: stats.pendingArtistRequests, icon: UserCheck, color: "text-yellow-500 border-yellow-500/50" },
-              { label: t("adminManagers"), value: stats.pendingManagerRequests, icon: Briefcase, color: "text-blue-500 border-blue-500/50" },
-              { label: t("adminDuelReq"), value: stats.pendingDuelRequests, icon: Swords, color: "text-purple-500 border-purple-500/50" },
-              { label: t("adminWithdrawals"), value: stats.pendingWithdrawals, icon: DollarSign, color: "text-green-500 border-green-500/50" },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <Card key={label} className={color ? `border-${color.split(" ")[1]}` : ""}>
-                <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-3">
-                  <CardTitle className={`text-xs font-medium ${color.split(" ")[0] || "text-muted-foreground"}`}>{label}</CardTitle>
-                  <Icon className={`h-3 w-3 ${color.split(" ")[0] || "text-muted-foreground"}`} />
-                </CardHeader>
-                <CardContent className="px-3 pb-3">
-                  <div className={`text-xl font-bold ${color.split(" ")[0] || ""}`}>{value}</div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <main className="flex-1 pt-20 pb-8 px-3 sm:px-4">
+        <div className="container max-w-[1600px] mx-auto">
+          <div className="flex gap-6">
+            <AdminSidebar
+              active={activeTab}
+              onSelect={handleSidebarSelect}
+              stats={{
+                pendingArtistRequests: stats.pendingArtistRequests,
+                pendingManagerRequests: stats.pendingManagerRequests,
+                pendingDuelRequests: stats.pendingDuelRequests,
+                pendingWithdrawals: stats.pendingWithdrawals,
+                activeLives: stats.activeLives,
+              }}
+              open={sidebarOpen}
+              onOpenChange={setSidebarOpen}
+            />
 
-          {/* Tabs */}
-          <Tabs defaultValue="stats" className="space-y-4">
-            <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-              <TabsTrigger value="stats" className="text-xs"><BarChart3 className="w-3 h-3 mr-1" />{t("adminTabStats")}</TabsTrigger>
+            <div className="flex-1 min-w-0">
+              <div className="mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  {t("adminDashTitle")}
+                </h1>
+                <p className="text-sm text-muted-foreground">{t("adminDashSubtitle")}</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2.5 mb-6">
+                {[
+                  { label: t("adminUsers"), value: stats.totalUsers, icon: Users, color: "" },
+                  { label: t("adminConcerts"), value: stats.totalConcerts, icon: Music, color: "" },
+                  { label: t("adminDuels"), value: stats.totalDuels, icon: Swords, color: "" },
+                  { label: t("adminReplays"), value: stats.totalReplays, icon: Video, color: "" },
+                  { label: t("adminActiveLives"), value: stats.activeLives, icon: Radio, color: "text-red-500 border-red-500/50" },
+                  { label: t("adminArtists"), value: stats.pendingArtistRequests, icon: UserCheck, color: "text-yellow-500 border-yellow-500/50" },
+                  { label: t("adminManagers"), value: stats.pendingManagerRequests, icon: Briefcase, color: "text-blue-500 border-blue-500/50" },
+                  { label: t("adminDuelReq"), value: stats.pendingDuelRequests, icon: Swords, color: "text-purple-500 border-purple-500/50" },
+                  { label: t("adminWithdrawals"), value: stats.pendingWithdrawals, icon: DollarSign, color: "text-green-500 border-green-500/50" },
+                ].map(({ label, value, icon: Icon, color }) => (
+                  <Card key={label} className={`border-border/60 ${color ? color.split(" ").slice(1).join(" ") : ""}`}>
+                    <CardHeader className="flex flex-row items-center justify-between pb-1 pt-2.5 px-3">
+                      <CardTitle className={`text-[10px] font-medium ${color.split(" ")[0] || "text-muted-foreground"}`}>{label}</CardTitle>
+                      <Icon className={`h-3 w-3 ${color.split(" ")[0] || "text-muted-foreground"}`} />
+                    </CardHeader>
+                    <CardContent className="px-3 pb-2.5">
+                      <div className={`text-lg font-bold ${color.split(" ")[0] || ""}`}>{value}</div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Tabs (controlled by sidebar) */}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                <TabsList className="sr-only">
+                  <TabsTrigger value="stats" className="text-xs"><BarChart3 className="w-3 h-3 mr-1" />{t("adminTabStats")}</TabsTrigger>
               <TabsTrigger value="artist-requests" className="text-xs">
                 {t("adminTabArtistReq")} {stats.pendingArtistRequests > 0 && <Badge className="ml-1 h-4 px-1 text-xs">{stats.pendingArtistRequests}</Badge>}
               </TabsTrigger>
@@ -843,6 +1013,10 @@ const Admin = () => {
               <TabsTrigger value="referrals" className="text-xs"><Gift className="w-3 h-3 mr-1" />{t("adminTabReferrals")}</TabsTrigger>
               <TabsTrigger value="lifestyle" className="text-xs"><Video className="w-3 h-3 mr-1" />{t("adminTabLifestyle")}</TabsTrigger>
               <TabsTrigger value="platform" className="text-xs"><Settings className="w-3 h-3 mr-1" />{t("adminTabPlatform")}</TabsTrigger>
+              <TabsTrigger value="economy" className="text-xs"><DollarSign className="w-3 h-3 mr-1" />{t("adminTabEconomy")}</TabsTrigger>
+              <TabsTrigger value="announcements" className="text-xs"><Megaphone className="w-3 h-3 mr-1" />{t("adminTabAnnouncements")}</TabsTrigger>
+              <TabsTrigger value="sponsors" className="text-xs"><Megaphone className="w-3 h-3 mr-1" />Sponsors</TabsTrigger>
+              <TabsTrigger value="cinetpay" className="text-xs"><DollarSign className="w-3 h-3 mr-1" />CinetPay</TabsTrigger>
             </TabsList>
 
             {/* ── Stats ─────────────────────────────────────────────────────── */}
@@ -1015,7 +1189,8 @@ const Admin = () => {
                                   key={request.id}
                                   request={request}
                                   managers={managers}
-                                  onApprove={(managerId, scheduledDate, ticketPrice) => handleDuelRequest(request.id, "approved", managerId, scheduledDate, ticketPrice)}
+                                  adminUserId={adminRef.current?.id || null}
+                                  onApprove={(managerId, scheduledDate, ticketPrice, allowsSponsorAds) => handleDuelRequest(request.id, "approved", managerId, scheduledDate, ticketPrice, allowsSponsorAds)}
                                   onReject={() => handleDuelRequest(request.id, "rejected")}
                                   getStatusBadge={statusBadge}
                                 />
@@ -1032,55 +1207,65 @@ const Admin = () => {
 
             {/* ── Withdrawals ───────────────────────────────────────────────── */}
             <TabsContent value="withdrawals">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("adminWithdrawalsTitle")}</CardTitle>
-                  <CardDescription>{t("adminWithdrawalsDesc")}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AdminTable
-                    data={withdrawalRequests}
-                    searchKeys={["user_name", "user_email", "payment_method"]}
-                    emptyMessage={t("adminNoWithdrawal")}
-                    columns={[
-                      { key: "user_name", label: t("adminColUser"), sortable: true },
-                      { key: "user_email", label: t("adminColEmail"), sortable: true },
-                      { key: "amount", label: t("adminColAmount"), sortable: true, render: (r) => <span className="font-bold text-green-500">{r.amount} €</span> },
-                      {
-                        key: "payment_details", label: t("adminColPaymentDetails"),
-                        render: (r) => (
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm"><CreditCard className="w-3 h-3 mr-1" />{t("adminSee")}</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader><DialogTitle>{t("adminPaymentDetailsTitle")} – {r.user_name}</DialogTitle></DialogHeader>
-                              <div className="space-y-3">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-muted-foreground text-sm">{t("adminPaymentAmount")} :</span>
-                                  <span className="font-bold text-green-500 text-lg">{r.amount} €</span>
-                                </div>
-                                <PaymentDetailsDisplay details={r.payment_details} method={r.payment_method} />
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        )
-                      },
-                      { key: "created_at", label: t("adminColDate"), sortable: true, render: (r) => fmt(r.created_at) },
-                      { key: "status", label: t("adminColStatus"), sortable: true, render: (r) => statusBadge(r.status) },
-                      {
-                        key: "actions", label: t("adminColActions"),
-                        render: (request) => request.status === "pending" ? (
-                          <div className="flex gap-2">
-                            <Button size="sm" className="bg-green-500 hover:bg-green-600" onClick={() => handleWithdrawalRequest(request.id, "completed")}><CheckCircle className="w-4 h-4" /></Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleWithdrawalRequest(request.id, "rejected")}><XCircle className="w-4 h-4" /></Button>
+              <WithdrawalPinGate>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>{t("adminWithdrawalsTitle")}</CardTitle>
+                    <CardDescription>{t("adminWithdrawalsDesc")}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AdminTable
+                      data={withdrawalRequests}
+                      searchKeys={["user_name", "user_email", "payment_method"]}
+                      emptyMessage={t("adminNoWithdrawal")}
+                      columns={[
+                        { key: "user_name", label: t("adminColUser"), sortable: true },
+                        { key: "user_email", label: t("adminColEmail"), sortable: true },
+                        { key: "amount", label: t("adminColAmount"), sortable: true, render: (r) => (
+                          <div className="flex flex-col">
+                            <span className="font-bold text-green-500">{formatCreditsLabel(Number(r.amount))}</span>
+                            <span className="text-[10px] text-muted-foreground">≈ {formatPrice(Number(r.amount))}</span>
                           </div>
-                        ) : null
-                      }
-                    ]}
-                  />
-                </CardContent>
-              </Card>
+                        ) },
+                        {
+                          key: "payment_details", label: t("adminColPaymentDetails"),
+                          render: (r) => (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" title={t("adminPaymentDetailsTitle")}><CreditCard className="w-3 h-3 mr-1" />{t("adminSee")}</Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader><DialogTitle>{t("adminPaymentDetailsTitle")} – {r.user_name}</DialogTitle></DialogHeader>
+                                <div className="space-y-3">
+                                  <div className="flex flex-col gap-1 mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground text-sm">{t("adminPaymentAmount")} :</span>
+                                      <span className="font-bold text-green-500 text-lg">{formatCreditsLabel(Number(r.amount))}</span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">≈ {formatPrice(Number(r.amount))}</span>
+                                  </div>
+                                  <PaymentDetailsDisplay details={r.payment_details} method={r.payment_method} />
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )
+                        },
+                        { key: "created_at", label: t("adminColDate"), sortable: true, render: (r) => fmt(r.created_at) },
+                        { key: "status", label: t("adminColStatus"), sortable: true, render: (r) => statusBadge(r.status) },
+                        {
+                          key: "actions", label: t("adminColActions"),
+                          render: (request) => request.status === "pending" ? (
+                            <div className="flex gap-2">
+                              <Button size="sm" className="bg-green-500 hover:bg-green-600" title={t("approve") || "Approuver"} aria-label={t("approve") || "Approuver"} onClick={() => handleWithdrawalRequest(request.id, "completed")}><CheckCircle className="w-4 h-4" /></Button>
+                              <Button size="sm" variant="destructive" title={t("reject") || "Rejeter"} aria-label={t("reject") || "Rejeter"} onClick={() => handleWithdrawalRequest(request.id, "rejected")}><XCircle className="w-4 h-4" /></Button>
+                            </div>
+                          ) : null
+                        }
+                      ]}
+                    />
+                  </CardContent>
+                </Card>
+              </WithdrawalPinGate>
             </TabsContent>
 
             {/* ── Users ─────────────────────────────────────────────────────── */}
@@ -1267,7 +1452,7 @@ const Admin = () => {
                       { key: "title", label: t("adminColTitle"), sortable: true },
                       { key: "artist_name", label: t("adminColArtist"), sortable: true },
                       { key: "scheduled_date", label: t("adminColDate"), sortable: true, render: (c) => fmt(c.scheduled_date) },
-                      { key: "ticket_price", label: t("adminColPrice"), sortable: true, render: (c) => `${c.ticket_price} €` },
+                      { key: "ticket_price", label: t("adminColPrice"), sortable: true, render: (c) => `${c.ticket_price} $` },
                       { key: "tickets_sold", label: t("adminColTicketsSold"), render: (c) => c.tickets_sold ?? 0 },
                       { key: "status", label: t("adminColStatus"), sortable: true, render: (c) => statusBadge(c.status) },
                       {
@@ -1350,7 +1535,7 @@ const Admin = () => {
                       { key: "source_type", label: t("adminColType"), sortable: true, render: (r: any) => <Badge variant="outline" className="capitalize">{r.source_type || "duel"}</Badge> },
                       { key: "recorded_date", label: t("adminColDate"), sortable: true, render: (r: any) => fmt(r.recorded_date) },
                       { key: "is_public", label: t("adminColPublic"), sortable: true, render: (r: any) => r.is_public ? <Badge className="bg-green-500 text-white">{t("adminYes")}</Badge> : <Badge variant="outline">{t("adminNo")}</Badge> },
-                      { key: "replay_price", label: t("adminColPrice"), render: (r: any) => r.replay_price > 0 ? `${r.replay_price} €` : t("adminFreeAccess") },
+                      { key: "replay_price", label: t("adminColPrice"), render: (r: any) => r.replay_price > 0 ? `${r.replay_price} $` : t("adminFreeAccess") },
                       { key: "views_count", label: t("adminColViews"), sortable: true, render: (r: any) => r.views_count || 0 },
                       {
                         key: "actions", label: t("adminColActions"),
@@ -1456,10 +1641,49 @@ const Admin = () => {
                 </CardContent>
               </Card>
             </TabsContent>
-          </Tabs>
+
+            {/* ── Économie ─────────────────────────────── */}
+            <TabsContent value="economy">
+              <Tabs defaultValue="config">
+                <TabsList className="flex-wrap h-auto">
+                  <TabsTrigger value="config">{t("ecoTabConfig")}</TabsTrigger>
+                  <TabsTrigger value="gifts-votes">Cadeaux & Votes</TabsTrigger>
+                  <TabsTrigger value="analytics">{t("ecoTabAnalytics")}</TabsTrigger>
+                  <TabsTrigger value="ledger">{t("ecoTabLedger")}</TabsTrigger>
+                </TabsList>
+                <TabsContent value="config" className="mt-6"><EconomicConfigManager /></TabsContent>
+                <TabsContent value="gifts-votes" className="mt-6"><GiftsVotesSettingsView /></TabsContent>
+                <TabsContent value="analytics" className="mt-6"><RevenueAnalytics /></TabsContent>
+                <TabsContent value="ledger" className="mt-6"><TransactionsLedger /></TabsContent>
+              </Tabs>
+            </TabsContent>
+
+            {/* ── Announcements ─────────────────────────────────────────────── */}
+            <TabsContent value="announcements">
+              <AdminAnnouncementsManager />
+            </TabsContent>
+
+            {/* ── Sponsors ──────────────────────────────────────────────────── */}
+            <TabsContent value="sponsors">
+              <AdminSponsorManager />
+            </TabsContent>
+
+            <TabsContent value="transactions"><TransactionsPanel /></TabsContent>
+            <TabsContent value="preferences"><PreferencesPanel /></TabsContent>
+            <TabsContent value="contact"><ContactInfoManager /></TabsContent>
+            <TabsContent value="communities"><SocialLinksManager /></TabsContent>
+            <TabsContent value="push"><PushConfigManager /></TabsContent>
+            <TabsContent value="documents"><AdminDocumentsManager /></TabsContent>
+            <TabsContent value="gifts"><AdminGiftsManager /></TabsContent>
+            <TabsContent value="concert-validation"><AdminConcertValidation /></TabsContent>
+            <TabsContent value="dedications"><AdminDedicationsManager /></TabsContent>
+            <TabsContent value="cinetpay"><CinetPayAdminPanel /></TabsContent>
+              </Tabs>
+            </div>
+          </div>
         </div>
       </main>
-      <Footer />
+      <ProfileFooter />
     </div>
   );
 };

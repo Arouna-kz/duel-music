@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Heart } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FloatingHeart {
   id: number;
@@ -35,6 +36,90 @@ export const useFloatingHearts = () => {
   }, []);
 
   return { hearts, addHeart };
+};
+
+/**
+ * Format like counts using K/M abbreviations to save space.
+ * 1000 -> "1K", 1500 -> "1.5K", 1000000 -> "1M".
+ */
+export const formatLikeCount = (count: number): string => {
+  if (count >= 1_000_000) {
+    const v = count / 1_000_000;
+    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}M`;
+  }
+  if (count >= 1000) {
+    const v = count / 1000;
+    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}K`;
+  }
+  return count.toString();
+};
+
+/**
+ * Hook to broadcast and receive heart "like" animations in real-time
+ * via Supabase broadcast. Includes anti-duplication on reconnects and
+ * a synchronized count of total likes received on the channel.
+ */
+export const useBroadcastHearts = (channelName: string | null) => {
+  const { hearts, addHeart } = useFloatingHearts();
+  const [likeCount, setLikeCount] = useState(0);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const seenIdsRef = useRef<Map<string, number>>(new Map());
+
+  // Periodic cleanup of seen IDs (TTL 60s) to bound memory.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      const map = seenIdsRef.current;
+      for (const [id, ts] of map) {
+        if (now - ts > 60_000) map.delete(id);
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleEvent = useCallback(
+    (heartId: string) => {
+      if (!heartId) return;
+      const map = seenIdsRef.current;
+      if (map.has(heartId)) return; // dedupe replays/reconnects
+      map.set(heartId, Date.now());
+      addHeart();
+      setLikeCount((c) => c + 1);
+    },
+    [addHeart],
+  );
+
+  useEffect(() => {
+    if (!channelName) return;
+    // Reset state per channel
+    seenIdsRef.current = new Map();
+    setLikeCount(0);
+
+    const channel = supabase.channel(channelName)
+      .on("broadcast", { event: "heart_like" }, (msg: any) => {
+        const heartId = msg?.payload?.id;
+        if (heartId) handleEvent(heartId);
+      })
+      .subscribe();
+    channelRef.current = channel;
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [channelName, handleEvent]);
+
+  const broadcastHeart = useCallback(() => {
+    const heartId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    // Local immediate feedback via the same dedup path so the count stays in sync.
+    handleEvent(heartId);
+    channelRef.current?.send({
+      type: "broadcast",
+      event: "heart_like",
+      payload: { id: heartId },
+    });
+  }, [handleEvent]);
+
+  return { hearts, broadcastHeart, likeCount, likeCountLabel: formatLikeCount(likeCount) };
 };
 
 interface FloatingHeartsProps {

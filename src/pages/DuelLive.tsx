@@ -14,8 +14,11 @@ import { QuickTip } from "@/components/duel/QuickTip";
 import { GiftLeaderboard } from "@/components/duel/GiftLeaderboard";
 
 import { ConcertRecordingControls } from "@/components/concert/ConcertRecordingControls";
-import { FloatingHearts, useFloatingHearts } from "@/components/animations/FloatingHearts";
+import { FloatingHearts, useBroadcastHearts, formatLikeCount } from "@/components/animations/FloatingHearts";
 import { FloatingEmojis, EmojiReactionBar, useBroadcastEmojis } from "@/components/animations/FloatingEmojis";
+import { TopDonorBubble } from "@/components/animations/TopDonorBubble";
+import { SponsorAdBroadcast } from "@/components/sponsor/SponsorAdBroadcast";
+import { SponsorAdHistoryPanel } from "@/components/sponsor/SponsorAdHistoryPanel";
 import { GiftAnimationWithSound } from "@/components/animations/GiftAnimationWithSound";
 import { StandardGiftNotification } from "@/components/animations/StandardGiftNotification";
 import { WinnerAnnouncement } from "@/components/animations/WinnerAnnouncement";
@@ -31,6 +34,7 @@ import { Slider } from "@/components/ui/slider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Users, MicOff, Mic, Video, VideoOff, UserX, Timer, Heart, Maximize, Minimize, Eye, EyeOff, Trophy } from "lucide-react";
 import { ShareButton } from "@/components/sharing/ShareButton";
+import { ScheduledAccessGate } from "@/components/scheduling/ScheduledAccessGate";
 import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
@@ -80,6 +84,7 @@ const DuelLive = () => {
   const [managerTimerRemaining, setManagerTimerRemaining] = useState(0);
   const managerTimerDeadlineRef = useRef<number | null>(null);
   const [likes, setLikes] = useState(0);
+  const [hasTicket, setHasTicket] = useState(false);
   const [mobileChatMessages, setMobileChatMessages] = useState<DuelChatMessage[]>([]);
   const [winnerAnnouncement, setWinnerAnnouncement] = useState<{ name: string; avatar: string | null; votes: number } | null>(null);
   const winnerChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -97,7 +102,7 @@ const DuelLive = () => {
     artist2: (handle) => { streamRefs.current.artist2 = handle; },
     manager: (handle) => { streamRefs.current.manager = handle; },
   }), []);
-  const { hearts, addHeart } = useFloatingHearts();
+  const { hearts, broadcastHeart: addHeart } = useBroadcastHearts(id ? `duel-hearts-${id}` : null);
   const { emojis: floatingEmojis, broadcastEmoji: addEmoji } = useBroadcastEmojis(id ? `duel-emojis-${id}` : null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const likesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -523,7 +528,13 @@ const DuelLive = () => {
       // Load persisted likes
       const { data: likesData } = await supabase.from("live_likes").select("likes_count").eq("live_id", id).single();
       if (likesData) setLikes(likesData.likes_count);
-      
+
+      // Check user ticket
+      if (user) {
+        const { data: ticket } = await supabase.from("duel_tickets").select("id").eq("duel_id", id).eq("user_id", user.id).maybeSingle();
+        setHasTicket(!!ticket);
+      }
+
       const profileIds = [data.artist1_id, data.artist2_id, data.manager_id].filter(Boolean);
       const { data: profilesData } = await supabase.rpc("get_display_profiles", { user_ids: profileIds });
       if (profilesData) {
@@ -647,24 +658,71 @@ const DuelLive = () => {
   // Which slot is "self" for the current user?
   const selfSlot: StreamSlot | null = isArtist1 ? 'artist1' : isArtist2 ? 'artist2' : isManager ? 'manager' : null;
 
+  // Eject non-participants when the duel is ended by the manager / artist.
+  const ejectedRef = useRef(false);
+  useEffect(() => {
+    if (!duel || ejectedRef.current) return;
+    if (duel.status !== "ended") return;
+    if (isParticipant) return; // host/manager/artist navigates via endDuel()
+    ejectedRef.current = true;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    toast({
+      title: t("duelEndedByHostTitle"),
+      description: t("duelEndedByHostDesc"),
+    });
+    navigate("/duels");
+  }, [duel?.status, isParticipant, navigate, t, toast, duel]);
+
   const handleStreamReady = useCallback(async (stream: MediaStream) => {
     setHostStream(stream);
     if (duel?.status === 'upcoming') {
       const now = new Date().toISOString();
       setStartedAt(now);
       await supabase.from("duels").update({ status: "live", started_at: now } as any).eq("id", id);
+
+      // Notify ticket holders + followers of artists that the duel is now live
+      try {
+        const { data: tickets } = await supabase
+          .from("duel_tickets").select("user_id").eq("duel_id", id);
+        const ticketIds = (tickets || []).map((t) => t.user_id);
+
+        let followerIds: string[] = [];
+        const artistIds = [duel.artist1_id, duel.artist2_id].filter(Boolean) as string[];
+        if (artistIds.length) {
+          const { data: followers } = await supabase
+            .from("artist_followers").select("follower_id").in("artist_id", artistIds);
+          followerIds = (followers || []).map((f) => f.follower_id);
+        }
+        const allIds = [...new Set([...ticketIds, ...followerIds])];
+        const a1 = profiles.artist1?.full_name || "Artist 1";
+        const a2 = profiles.artist2?.full_name || "Artist 2";
+        await Promise.allSettled(
+          allIds.map((userId) =>
+            supabase.functions.invoke("notify-user-event", {
+              body: {
+                userId,
+                type: "duel_live",
+                data: { duelId: id, artist1Name: a1, artist2Name: a2 },
+              },
+            })
+          )
+        );
+      } catch (err) {
+        console.error("Failed to notify duel_live:", err);
+      }
     }
-  }, [duel?.status, id]);
+  }, [duel?.status, duel?.artist1_id, duel?.artist2_id, id, profiles.artist1, profiles.artist2]);
 
   const sendLike = async () => {
     const newCount = likes + 1;
     setLikes(newCount);
     addHeart();
-    // Persist to DB
-    await supabase.from("live_likes").upsert(
-      { live_id: id!, likes_count: newCount },
-      { onConflict: "live_id" }
-    );
+    // Persist to DB via secured RPC
+    if (id) {
+      await supabase.rpc("increment_live_likes" as any, { p_live_id: id, p_delta: 1 });
+    }
     likesChannelRef.current?.send({ type: "broadcast", event: "like", payload: { count: newCount } });
   };
 
@@ -896,8 +954,20 @@ const DuelLive = () => {
     const allSlots: StreamSlot[] = ['artist1', 'artist2', ...(duel.manager_id ? ['manager' as StreamSlot] : [])];
 
     return (
-      <div className="fixed inset-0 bg-black z-50">
-        <div className="relative w-full h-full" ref={videoContainerRef}>
+      <>
+        <ScheduledAccessGate
+          type="duel"
+          scheduledAt={duel.scheduled_time}
+          status={duel.status}
+          eventId={duel.id}
+          ticketPrice={Number(duel.ticket_price) || 0}
+          isActor={isParticipant || userRoles.includes("admin")}
+          hasTicket={hasTicket}
+          isAuthenticated={!!currentUserId}
+          onPurchased={() => setHasTicket(true)}
+        />
+        <div className="fixed inset-0 bg-black z-50">
+          <div className="relative w-full h-full" ref={videoContainerRef}>
 
           {/* === ALL STREAMS rendered persistently — CSS controls position, never unmounted === */}
           {allSlots.map(slot => {
@@ -1014,6 +1084,7 @@ const DuelLive = () => {
             showGuestThumbnails={showThumbnails}
             onToggleThumbnails={() => setShowThumbnails(prev => !prev)}
             hasGuests={true}
+            sponsorAdContent={id && isManager && ((duel as any).allows_sponsor_ads !== false) ? <SponsorAdBroadcast eventType="duel" eventId={id} canTrigger={true} /> : undefined}
             voteBarContent={
               votes.artist1 + votes.artist2 > 0 || isLive ? (
                 <div className="w-full h-7 bg-black/60 backdrop-blur-sm flex items-center relative overflow-hidden">
@@ -1132,12 +1203,24 @@ const DuelLive = () => {
           )}
         </div>
       </div>
+      </>
     );
   }
 
   // ===== DESKTOP LAYOUT =====
   return (
     <div className="min-h-screen bg-background">
+      <ScheduledAccessGate
+        type="duel"
+        scheduledAt={duel?.scheduled_time}
+        status={duel?.status}
+        eventId={duel?.id}
+        ticketPrice={Number(duel?.ticket_price) || 0}
+        isActor={isParticipant || userRoles.includes("admin")}
+        hasTicket={hasTicket}
+        isAuthenticated={!!currentUserId}
+        onPurchased={() => setHasTicket(true)}
+      />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="flex items-center justify-between mb-6">
@@ -1259,7 +1342,7 @@ const DuelLive = () => {
                   </div>
                   <div className="flex items-center gap-2 pointer-events-auto">
                     <button onClick={sendLike} className="bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2 hover:bg-background/70 transition-colors">
-                      <Heart className="w-5 h-5 fill-destructive text-destructive" /> {likes}
+                      <Heart className="w-5 h-5 fill-destructive text-destructive" /> {formatLikeCount(likes)}
                     </button>
                     <ShareButton contentType="duel" contentId={id!} title={`Duel: ${profiles.artist1?.full_name || ''} vs ${profiles.artist2?.full_name || ''}`} variant="overlay" />
                     <FullscreenButton targetRef={videoContainerRef} />
@@ -1267,6 +1350,8 @@ const DuelLive = () => {
                 </div>
                 <FloatingHearts hearts={hearts} />
                 <FloatingEmojis emojis={floatingEmojis} />
+                {id && <TopDonorBubble contextType="duel" contextId={id} />}
+                {/* Sponsor ad triggers are rendered inline below in the action row to avoid covering other buttons */}
               </div>
 
               <CardContent className="p-4">
@@ -1305,7 +1390,11 @@ const DuelLive = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {/* Sponsor ad — viewer overlay always mounted; controls only for manager. Hidden completely if duel disallows sponsors */}
+                    {id && ((duel as any).allows_sponsor_ads !== false) && (
+                      <SponsorAdBroadcast eventType="duel" eventId={id} canTrigger={!!isManager} />
+                    )}
                     <Button onClick={sendLike} variant="outline" className="border-destructive text-destructive hover:bg-destructive/10">
                       <Heart className="w-4 h-4 mr-2" /> {t("likeBtn")}
                     </Button>
@@ -1403,6 +1492,9 @@ const DuelLive = () => {
                 </div>
               </Card>
             )}
+            {isManager && id && (
+              <SponsorAdHistoryPanel eventType="duel" eventId={id} />
+            )}
           </div>
 
           {/* Side Panels */}
@@ -1412,7 +1504,7 @@ const DuelLive = () => {
             <QuickTip duelId={id!} recipientIds={[{ id: duel.artist1_id, name: profiles.artist1?.full_name || "Artiste 1" }, { id: duel.artist2_id, name: profiles.artist2?.full_name || "Artiste 2" }]} />
             <GiftLeaderboard duelId={id!} />
             <div className="h-[400px]">
-              <ThreadedChat chatType="duel" entityId={id!} participants={[
+              <ThreadedChat chatType="duel" entityId={id!} hostId={duel.manager_id ?? null} participants={[
                 ...(profiles.artist1 ? [{ id: duel.artist1_id, name: profiles.artist1.full_name || "Artiste 1" }] : []),
                 ...(profiles.artist2 ? [{ id: duel.artist2_id, name: profiles.artist2.full_name || "Artiste 2" }] : []),
                 ...(profiles.manager ? [{ id: duel.manager_id, name: `${profiles.manager.full_name || "Manager"} (Manager)` }] : []),

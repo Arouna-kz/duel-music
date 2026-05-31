@@ -8,8 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Music2, LogOut, Wallet, Video, Award, Users, Gift, Trophy, Play, Upload, TrendingUp, Ticket, Calendar, Eye, Settings, Mic, Star, Crown, Briefcase, DollarSign, FileText, UserCheck, Camera, Lock, Bell } from "lucide-react";
-import Header from "@/components/Header";
+import { Music2, LogOut, Wallet, Video, Award, Users, Gift, Trophy, Play, Upload, TrendingUp, Ticket, Calendar, Eye, Settings, Mic, Star, Crown, Briefcase, DollarSign, FileText, UserCheck, Camera, Lock, Bell, BookOpen } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import ProfileHeader from "@/components/profile/ProfileHeader";
+import ProfileFooter from "@/components/profile/ProfileFooter";
+import ProfileSidebar, { ProfileRole } from "@/components/profile/ProfileSidebar";
+import AdminSidebar from "@/components/admin/AdminSidebar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { UserBadges } from "@/components/profile/UserBadges";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +24,7 @@ import { ArtistPublicProfile } from "@/components/artist/ArtistPublicProfile";
 import { DuelRequestForm } from "@/components/artist/DuelRequestForm";
 import { WithdrawalForm } from "@/components/artist/WithdrawalForm";
 import { ArtistConcertManager } from "@/components/artist/ArtistConcertManager";
+import { ArtistDedicationsManager } from "@/components/artist/ArtistDedicationsManager";
 import { ArtistLivesManager } from "@/components/artist/ArtistLivesManager";
 import { ManagerValidationForm } from "@/components/manager/ManagerValidationForm";
 import { FanSubscription } from "@/components/fan/FanSubscription";
@@ -29,7 +35,18 @@ import { AdminProfileStats } from "@/components/profile/AdminProfileStats";
 import { ManagerPublicProfileEditor } from "@/components/manager/ManagerPublicProfileEditor";
 import { RequestTracker } from "@/components/profile/RequestTracker";
 import { EmailNotificationPreferences } from "@/components/profile/EmailNotificationPreferences";
+import { VisualNotificationPreferences } from "@/components/profile/VisualNotificationPreferences";
+import ReferralSection from "@/components/referral/ReferralSection";
+import SponsorRequestSection from "@/components/sponsor/SponsorRequestSection";
+import { CurrencySelector } from "@/components/profile/CurrencySelector";
+import PreferencesPanel from "@/components/profile/PreferencesPanel";
+import TransactionsPanel from "@/components/profile/TransactionsPanel";
+import FanDedications from "@/components/profile/FanDedications";
+import RewardMeetingCard from "@/components/profile/RewardMeetingCard";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useTransactionNotifications } from "@/hooks/useTransactionNotifications";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface Profile {
   id: string;
@@ -69,7 +86,10 @@ interface Duel {
 const Profile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
+  const fmtDateTime = (d: string) => formatTz(d, "dd MMM yyyy HH:mm", { timezone: tz, language });
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [wallet, setWallet] = useState<number>(0);
@@ -82,6 +102,11 @@ const Profile = () => {
   const [myDuels, setMyDuels] = useState<Duel[]>([]);
   const [managedDuels, setManagedDuels] = useState<Duel[]>([]);
   const [editMode, setEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Realtime toasts when a transaction is confirmed (purchase, gift, withdrawal)
+  useTransactionNotifications(profile?.id ?? null);
 
   useEffect(() => {
     loadProfile();
@@ -288,11 +313,26 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center">{t("loading")}</p>
-        </div>
+      <div className="min-h-screen flex flex-col bg-background">
+        <ProfileHeader />
+        <main className="flex-1 container mx-auto px-3 sm:px-4 pt-20 pb-8">
+          <div className="flex gap-6">
+            <div className="hidden lg:block w-60 shrink-0">
+              <Skeleton className="h-[calc(100vh-6rem)] rounded-xl" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <Skeleton className="h-40 rounded-xl" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-24 rounded-xl" />
+                <Skeleton className="h-24 rounded-xl" />
+              </div>
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          </div>
+        </main>
+        <ProfileFooter />
       </div>
     );
   }
@@ -345,14 +385,49 @@ const Profile = () => {
     }
   };
 
+  const sidebarRole: ProfileRole = isArtist ? "artist" : isManager ? "manager" : "fan";
+
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      
-      <div className="container mx-auto px-4 pt-24 pb-8">
-        <div className="max-w-5xl mx-auto space-y-6">
+    <div className="min-h-screen flex flex-col bg-background">
+      <ProfileHeader primaryRole={primaryRole as any} showMenuButton onMenuToggle={() => setSidebarOpen((v) => !v)} />
+
+      <main className="flex-1 container mx-auto px-3 sm:px-4 pt-20 pb-8">
+        <div className="flex gap-6">
+          {isAdmin ? (
+            <AdminSidebar
+              active="profile"
+              onSelect={(v) => {
+                if (v === "profile") return;
+                if (v === "transactions") { navigate("/transactions"); return; }
+                navigate(`/admin?tab=${v}`);
+              }}
+              stats={{
+                pendingArtistRequests: 0,
+                pendingManagerRequests: 0,
+                pendingDuelRequests: 0,
+                pendingWithdrawals: 0,
+                activeLives: 0,
+              }}
+              open={sidebarOpen}
+              onOpenChange={setSidebarOpen}
+            />
+          ) : (
+            <ProfileSidebar
+              role={sidebarRole}
+              active={activeTab}
+              onSelect={(v) => {
+                if (v === "transactions") { navigate("/transactions"); return; }
+                setActiveTab(v);
+              }}
+              open={sidebarOpen}
+              onOpenChange={setSidebarOpen}
+              title={getRoleTitle()}
+            />
+          )}
+          <div className="flex-1 min-w-0 max-w-5xl space-y-6">
           
-          {/* Hero Card avec couleur selon le rôle */}
+          {/* Hero Card avec couleur selon le rôle - visible selon le contexte */}
+          {(((isArtist || isManager) && activeTab === "profile") || (isFan && activeTab === "dashboard") || isAdmin) && (
           <Card className={`relative overflow-hidden border-0`}>
             <div className={`absolute inset-0 bg-gradient-to-r ${getRoleGradient()} opacity-10`} />
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${getRoleGradient()}`} />
@@ -380,31 +455,39 @@ const Profile = () => {
                   </div>
                   
                   <p className="text-muted-foreground">{profile?.email}</p>
-                  
-                  {bio && (
-                    <p className="text-sm text-muted-foreground italic max-w-xl">"{bio}"</p>
-                  )}
+
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <div className="flex items-center gap-2 bg-accent/50 px-4 h-10 rounded-md border border-border/50">
+                      <Wallet className="w-5 h-5 text-primary" />
+                      <span className="font-bold">{wallet}</span>
+                      <span className="text-xs text-muted-foreground">{t("creditsLabel")}</span>
+                    </div>
+                    {bio && (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="default" className="gap-2 h-10">
+                            <BookOpen className="w-4 h-4" />
+                            {t("biography") || "Biographie"}
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>{t("biography") || "Biographie"}</DialogTitle>
+                          </DialogHeader>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap italic">"{bio}"</p>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                  </div>
 
                   {/* User Badges */}
                   {profile?.id && <UserBadges userId={profile.id} />}
-                  
-                  <div className="flex items-center gap-4 pt-2">
-                    <div className="flex items-center gap-2 bg-accent/50 px-4 py-2 rounded-full">
-                      <Wallet className="w-5 h-5 text-primary" />
-                      <span className="font-bold text-lg">{wallet}</span>
-                      <span className="text-sm text-muted-foreground">{t("creditsLabel")}</span>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex flex-col gap-2">
                   <Button variant="outline" onClick={() => setEditMode(!editMode)} size="sm">
                     <Settings className="w-4 h-4 mr-2" />
                     {editMode ? t("cancel") : t("edit")}
-                  </Button>
-                  <Button variant="ghost" onClick={handleLogout} size="sm" className="text-muted-foreground">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    {t("logout")}
                   </Button>
                 </div>
               </div>
@@ -442,6 +525,7 @@ const Profile = () => {
               )}
             </div>
           </Card>
+          )}
 
           {/* Actions rapides universelles */}
           <Card className="p-4">
@@ -462,6 +546,10 @@ const Profile = () => {
                 <Ticket className="w-4 h-4 mr-2" />
                 {t("concerts")}
               </Button>
+              <Button variant="outline" onClick={() => navigate("/gift-shop")}>
+                <Gift className="w-4 h-4 mr-2" />
+                {t("giftShop") || "Boutique cadeaux"}
+              </Button>
               {isAdmin && (
                 <Button variant="outline" onClick={() => navigate("/admin")} className="border-red-500/50 text-red-500 hover:bg-red-500/10">
                   <Crown className="w-4 h-4 mr-2" />
@@ -479,11 +567,13 @@ const Profile = () => {
                 <h2 className="text-2xl font-bold">{t("fanSpace")}</h2>
               </div>
 
-              <Tabs defaultValue="dashboard" className="w-full">
-                <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="sr-only">
                   <TabsTrigger value="dashboard" className="text-xs sm:text-sm">{t("dashboard")}</TabsTrigger>
                   <TabsTrigger value="followed" className="text-xs sm:text-sm">{t("followed")}</TabsTrigger>
                   <TabsTrigger value="subscription" className="text-xs sm:text-sm">{t("subscription")}</TabsTrigger>
+                  <TabsTrigger value="referral" className="text-xs sm:text-sm"><Gift className="w-3 h-3 mr-1" />{t("referralProgram")}</TabsTrigger>
+                  <TabsTrigger value="sponsor" className="text-xs sm:text-sm">Sponsor</TabsTrigger>
                   <TabsTrigger value="become-artist" className="text-xs sm:text-sm">{t("becomeArtist")}</TabsTrigger>
                   <TabsTrigger value="become-manager" className="text-xs sm:text-sm">{t("becomeManager")}</TabsTrigger>
                   <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="w-3 h-3 mr-1" />{t("notifs")}</TabsTrigger>
@@ -491,6 +581,7 @@ const Profile = () => {
 
                 <TabsContent value="dashboard" className="space-y-6 mt-6">
                   {profile?.id && <RequestTracker userId={profile.id} />}
+                  {profile?.id && <RewardMeetingCard userId={profile.id} />}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card className="p-6 text-center bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20">
                       <Award className="w-10 h-10 mx-auto mb-3 text-green-500" />
@@ -534,6 +625,14 @@ const Profile = () => {
                   <FanSubscription userId={profile?.id || ""} />
                 </TabsContent>
 
+                <TabsContent value="referral" className="mt-6">
+                  <ReferralSection />
+                </TabsContent>
+
+                <TabsContent value="sponsor" className="mt-6">
+                  <SponsorRequestSection />
+                </TabsContent>
+
                 <TabsContent value="become-artist" className="mt-6">
                   <ArtistValidationForm userId={profile?.id || ""} />
                 </TabsContent>
@@ -542,8 +641,15 @@ const Profile = () => {
                   <ManagerValidationForm userId={profile?.id || ""} />
                 </TabsContent>
 
-                <TabsContent value="notifications" className="mt-6">
+                <TabsContent value="notifications" className="mt-6 space-y-6">
                   <EmailNotificationPreferences userRoles={roles} />
+                </TabsContent>
+                <TabsContent value="preferences" className="mt-6 space-y-6">
+                  <PreferencesPanel />
+                </TabsContent>
+                <TabsContent value="transactions" className="mt-6 space-y-6">
+                  <TransactionsPanel />
+                  {profile?.id && <FanDedications userId={profile.id} />}
                 </TabsContent>
               </Tabs>
             </div>
@@ -557,8 +663,8 @@ const Profile = () => {
                 <h2 className="text-2xl font-bold">{t("artistSpace")}</h2>
               </div>
 
-              <Tabs defaultValue="dashboard" className="w-full">
-                <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="sr-only">
                   <TabsTrigger value="dashboard" className="text-xs sm:text-sm">{t("dashboard")}</TabsTrigger>
                   <TabsTrigger value="profile" className="text-xs sm:text-sm">{t("artistProfile")}</TabsTrigger>
                   <TabsTrigger value="duels" className="text-xs sm:text-sm">{t("duels")}</TabsTrigger>
@@ -566,11 +672,13 @@ const Profile = () => {
                   <TabsTrigger value="lives" className="text-xs sm:text-sm">{t("lives")}</TabsTrigger>
                   <TabsTrigger value="content" className="text-xs sm:text-sm">{t("content")}</TabsTrigger>
                   <TabsTrigger value="earnings" className="text-xs sm:text-sm">{t("earnings")}</TabsTrigger>
+                  <TabsTrigger value="referral" className="text-xs sm:text-sm"><Gift className="w-3 h-3 mr-1" />{t("referralProgram")}</TabsTrigger>
                   <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="w-3 h-3 mr-1" />{t("notifs")}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="dashboard" className="space-y-6 mt-6">
                   {profile?.id && <RequestTracker userId={profile.id} />}
+                  {profile?.id && <RewardMeetingCard userId={profile.id} />}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Card className="p-5 text-center bg-gradient-to-br from-purple-500/10 to-pink-500/5 border-purple-500/20">
                       <TrendingUp className="w-8 h-8 mx-auto mb-2 text-purple-500" />
@@ -617,7 +725,7 @@ const Profile = () => {
                                 {duel.scheduled_time && (
                                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Calendar className="w-3 h-3" />
-                                    {new Date(duel.scheduled_time).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    {fmtDateTime(duel.scheduled_time)}
                                   </p>
                                 )}
                               </div>
@@ -640,8 +748,9 @@ const Profile = () => {
                   <DuelRequestForm userId={profile?.id || ""} />
                 </TabsContent>
 
-                <TabsContent value="concerts" className="mt-6">
+                <TabsContent value="concerts" className="mt-6 space-y-6">
                   <ArtistConcertManager userId={profile?.id || ""} />
+                  <ArtistDedicationsManager artistId={profile?.id || ""} />
                 </TabsContent>
 
                 <TabsContent value="lives" className="mt-6">
@@ -679,9 +788,16 @@ const Profile = () => {
                   <WithdrawalForm userId={profile?.id || ""} availableBalance={wallet} />
                 </TabsContent>
 
-                <TabsContent value="notifications" className="mt-6">
+                <TabsContent value="referral" className="mt-6">
+                  <ReferralSection />
+                </TabsContent>
+
+                <TabsContent value="notifications" className="mt-6 space-y-6">
                   <EmailNotificationPreferences userRoles={roles} />
                 </TabsContent>
+                <TabsContent value="preferences" className="mt-6"><PreferencesPanel /></TabsContent>
+                <TabsContent value="transactions" className="mt-6"><TransactionsPanel /></TabsContent>
+                <TabsContent value="followed" className="mt-6"><FollowedArtists userId={profile?.id || ""} /></TabsContent>
               </Tabs>
             </div>
           )}
@@ -694,12 +810,13 @@ const Profile = () => {
                 <h2 className="text-2xl font-bold">{t("managerSpace")}</h2>
               </div>
 
-              <Tabs defaultValue="dashboard" className="w-full">
-                <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="sr-only">
                   <TabsTrigger value="dashboard" className="text-xs sm:text-sm">{t("dashboard")}</TabsTrigger>
                   <TabsTrigger value="duels" className="text-xs sm:text-sm">{t("myDuelsTab")}</TabsTrigger>
                   <TabsTrigger value="profile" className="text-xs sm:text-sm">{t("artistProfile")}</TabsTrigger>
                   <TabsTrigger value="earnings" className="text-xs sm:text-sm">{t("earnings")}</TabsTrigger>
+                  <TabsTrigger value="referral" className="text-xs sm:text-sm"><Gift className="w-3 h-3 mr-1" />{t("referralProgram")}</TabsTrigger>
                   <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="w-3 h-3 mr-1" />{t("notifs")}</TabsTrigger>
                 </TabsList>
 
@@ -758,7 +875,7 @@ const Profile = () => {
                                 {duel.scheduled_time && (
                                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                                     <Calendar className="w-3 h-3" />
-                                    {new Date(duel.scheduled_time).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                    {fmtDateTime(duel.scheduled_time)}
                                   </p>
                                 )}
                               </div>
@@ -790,9 +907,16 @@ const Profile = () => {
                   <WithdrawalForm userId={profile?.id || ""} availableBalance={wallet} />
                 </TabsContent>
 
-                <TabsContent value="notifications" className="mt-6">
+                <TabsContent value="referral" className="mt-6">
+                  <ReferralSection />
+                </TabsContent>
+
+                <TabsContent value="notifications" className="mt-6 space-y-6">
                   <EmailNotificationPreferences userRoles={roles} />
                 </TabsContent>
+                <TabsContent value="preferences" className="mt-6"><PreferencesPanel /></TabsContent>
+                <TabsContent value="transactions" className="mt-6"><TransactionsPanel /></TabsContent>
+                <TabsContent value="followed" className="mt-6"><FollowedArtists userId={profile?.id || ""} /></TabsContent>
               </Tabs>
             </div>
           )}
@@ -807,6 +931,8 @@ const Profile = () => {
 
               <AdminProfileStats />
 
+              <ReferralSection />
+
               <Card className="p-6 bg-gradient-to-br from-red-500/10 to-orange-500/5 border-red-500/20">
                 <p className="text-muted-foreground mb-4">
                   {t("adminDescription")}
@@ -819,8 +945,10 @@ const Profile = () => {
             </div>
           )}
 
+          </div>
         </div>
-      </div>
+      </main>
+      <ProfileFooter />
     </div>
   );
 };

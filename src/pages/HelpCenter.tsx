@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import SEO from "@/components/seo/SEO";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,7 @@ const HelpCenter = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Centre d'aide — Duel Music" description="Réponses aux questions fréquentes sur Duel Music : duels, concerts, paiements, cadeaux." path="/help" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">

@@ -8,9 +8,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Calendar, User, Eye } from "lucide-react";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { useLanguage } from "@/contexts/LanguageContext";
 import CommentSection from "@/components/comments/CommentSection";
+import SEO from "@/components/seo/SEO";
 
 interface Blog {
   id: string;
@@ -29,6 +31,9 @@ interface Blog {
 const BlogDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { prefs } = useUiPreferences();
+  const { language } = useLanguage();
+  const tz = prefs.timezone;
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -99,6 +104,23 @@ const BlogDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={`${blog.title} — Blog Duel Music`}
+        description={blog.excerpt || blog.content?.slice(0, 155) || "Article du blog Duel Music"}
+        path={`/blog/${blog.id}`}
+        image={blog.image_url || undefined}
+        type="article"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: blog.title,
+          description: blog.excerpt || undefined,
+          image: blog.image_url || undefined,
+          author: { "@type": "Person", name: blog.author_name },
+          datePublished: blog.created_at,
+          articleSection: blog.category,
+        }}
+      />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="max-w-4xl mx-auto">
@@ -139,7 +161,7 @@ const BlogDetail = () => {
                 </p>
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
-                  {format(new Date(blog.created_at), "d MMMM yyyy", { locale: fr })}
+                  {formatTz(blog.created_at, "d MMMM yyyy", { timezone: tz, language })}
                 </p>
               </div>
               <div className="ml-auto flex items-center gap-2 text-muted-foreground">

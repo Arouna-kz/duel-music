@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Play, Eye, ArrowLeft, Calendar, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,7 +26,9 @@ interface Replay {
 }
 
 const MyReplays = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const navigate = useNavigate();
   const [replays, setReplays] = useState<Replay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -171,7 +175,7 @@ const MyReplays = () => {
                     </div>
                     <div className="flex items-center gap-1">
                       <Calendar className="w-4 h-4" />
-                      <span>{new Date(replay.recorded_date).toLocaleDateString()}</span>
+                      <span>{formatTz(replay.recorded_date, "d MMM yyyy", { timezone: tz, language })}</span>
                     </div>
                   </div>
                 </CardContent>

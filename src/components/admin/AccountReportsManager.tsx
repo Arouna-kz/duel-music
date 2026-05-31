@@ -9,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { AlertTriangle, Ban, Send, Shield, User, ChevronDown, ChevronUp } from "lucide-react";
 
 interface ReportedUser {
@@ -21,6 +23,8 @@ interface ReportedUser {
 export const AccountReportsManager = () => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [reportedUsers, setReportedUsers] = useState<ReportedUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -89,7 +93,7 @@ export const AccountReportsManager = () => {
   };
 
   const filtered = reportedUsers.filter(u => !searchQuery || u.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase()));
-  const fmt = (dt: string) => new Date(dt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmt = (dt: string) => formatTz(dt, "dd MMM yyyy HH:mm", { timezone: tz, language });
 
   const severityBadge = (count: number) => {
     if (count >= 50) return <Badge variant="destructive">{t("adminReportsCritical")} ({count})</Badge>;

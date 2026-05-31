@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
+import SEO from "@/components/seo/SEO";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, ArrowRight } from "lucide-react";
@@ -21,7 +24,9 @@ interface Blog {
 }
 
 const Blog = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const navigate = useNavigate();
   const [articles, setArticles] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,13 +48,8 @@ const Blog = () => {
     fetchBlogs();
   }, []);
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-  };
+  const formatDate = (dateStr: string) =>
+    formatTz(dateStr, "d MMMM yyyy", { timezone: tz, language });
 
   if (loading) {
     return (
@@ -64,6 +64,7 @@ const Blog = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Blog — Duel Music" description="Actualités, interviews et coulisses de la scène musicale Duel Music." path="/blog" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">

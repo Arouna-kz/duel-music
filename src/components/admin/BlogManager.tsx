@@ -13,6 +13,8 @@ import { AdminTable } from "@/components/admin/AdminTable";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Plus, Edit, Trash2 } from "lucide-react";
 
 interface Blog {
@@ -30,6 +32,8 @@ interface Blog {
 export const BlogManager = () => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [blogs, setBlogs] = useState<Blog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +93,7 @@ export const BlogManager = () => {
     setIsDialogOpen(false);
   };
 
-  const fmt = (dt: string) => new Date(dt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const fmt = (dt: string) => formatTz(dt, "dd MMM yyyy", { timezone: tz, language });
 
   return (
     <Card>

@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import SEO from "@/components/seo/SEO";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -12,6 +13,7 @@ import {
 const UserGuide = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO title="Guide d'utilisation — Duel Music" description="Tout pour bien démarrer sur Duel Music : voter, suivre des artistes, organiser des duels." path="/user-guide" />
       <Header />
       <main className="flex-1 pt-24 pb-12 px-4">
         <div className="container max-w-5xl mx-auto">
@@ -108,7 +110,7 @@ const UserGuide = () => {
                       <p>3. Choisissez un montant prédéfini ou entrez un montant personnalisé</p>
                       <p>4. Procédez au paiement sécurisé via Stripe</p>
                       <p className="text-sm mt-2 p-2 bg-accent rounded">
-                        💡 Montant minimum : 5€
+                        💡 Montant minimum : $5
                       </p>
                     </AccordionContent>
                   </AccordionItem>

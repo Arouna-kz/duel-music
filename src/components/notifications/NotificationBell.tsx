@@ -13,6 +13,47 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { formatDistanceToNow } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 
+const NotificationItem = ({ notification, icon, dateLocale, onMarkRead, expandLabel, collapseLabel }: {
+  notification: Notification;
+  icon: JSX.Element;
+  dateLocale: any;
+  onMarkRead: (id: string) => void;
+  expandLabel: string;
+  collapseLabel: string;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = (notification.message?.length || 0) > 90;
+  return (
+    <div
+      className={`p-4 hover:bg-accent/50 transition-colors ${!notification.read ? "bg-primary/5" : ""}`}
+      onClick={() => !notification.read && onMarkRead(notification.id)}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5">{icon}</div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm">{notification.title}</p>
+          <p className={`text-xs text-muted-foreground whitespace-pre-wrap break-words ${expanded ? "" : "line-clamp-2"}`}>
+            {notification.message}
+          </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+              className="mt-1 text-[11px] font-semibold text-primary hover:underline"
+            >
+              {expanded ? collapseLabel : expandLabel}
+            </button>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: dateLocale })}
+          </p>
+        </div>
+        {!notification.read && <div className="w-2 h-2 rounded-full bg-primary mt-1" />}
+      </div>
+    </div>
+  );
+};
+
 interface Notification {
   id: string;
   type: string;
@@ -161,34 +202,15 @@ export const NotificationBell = () => {
           ) : (
             <div className="divide-y divide-border">
               {notifications.map((notification) => (
-                <div
+                <NotificationItem
                   key={notification.id}
-                  className={`p-4 hover:bg-accent/50 cursor-pointer transition-colors ${
-                    !notification.read ? "bg-primary/5" : ""
-                  }`}
-                  onClick={() => !notification.read && markAsRead(notification.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{notification.title}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatDistanceToNow(new Date(notification.created_at), {
-                          addSuffix: true,
-                          locale: dateLocale,
-                        })}
-                      </p>
-                    </div>
-                    {!notification.read && (
-                      <div className="w-2 h-2 rounded-full bg-primary mt-1" />
-                    )}
-                  </div>
-                </div>
+                  notification={notification}
+                  icon={getNotificationIcon(notification.type)}
+                  dateLocale={dateLocale}
+                  onMarkRead={markAsRead}
+                  expandLabel={language === "fr" ? "Voir plus" : "See more"}
+                  collapseLabel={language === "fr" ? "Voir moins" : "See less"}
+                />
               ))}
             </div>
           )}

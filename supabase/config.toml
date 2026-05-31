@@ -32,3 +32,18 @@ verify_jwt = false
 
 [functions.livekit-token]
 verify_jwt = false
+
+[functions.duel-reminders]
+verify_jwt = false
+
+[functions.cinetpay-webhook-payin]
+verify_jwt = false
+
+[functions.cinetpay-webhook-payout]
+verify_jwt = false
+
+[functions.moneroo-webhook-payin]
+verify_jwt = false
+
+[functions.moneroo-webhook-payout]
+verify_jwt = false

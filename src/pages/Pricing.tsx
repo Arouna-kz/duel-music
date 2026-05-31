@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import SEO from "@/components/seo/SEO";
 import { useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -31,14 +32,15 @@ const Pricing = () => {
   }, [pricingEnabled, pricingLoading, navigate]);
 
   const creditPacks = [
-    { credits: 100, price: "4.99€", bonus: "" },
-    { credits: 500, price: "19.99€", bonus: "+50" },
-    { credits: 1000, price: "34.99€", bonus: "+150" },
-    { credits: 5000, price: "149.99€", bonus: "+1000" }
+    { credits: 100, price: "$4.99", bonus: "" },
+    { credits: 500, price: "$19.99", bonus: "+50" },
+    { credits: 1000, price: "$34.99", bonus: "+150" },
+    { credits: 5000, price: "$149.99", bonus: "+1000" }
   ];
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Tarifs & abonnements — Duel Music" description="Découvrez nos formules Free, Pro et Premium. Achetez des crédits pour voter, offrir des cadeaux et soutenir vos artistes." path="/pricing" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">
@@ -79,7 +81,7 @@ const Pricing = () => {
                   <CardContent className="text-center">
                     <div className="mb-6">
                       <span className="text-4xl font-bold text-foreground">
-                        {plan.price === 0 ? t("freeLabel") : `${plan.price}€`}
+                        {plan.price === 0 ? t("freeLabel") : `$${plan.price}`}
                       </span>
                       {plan.price > 0 && <span className="text-muted-foreground">/{t("perMonth")}</span>}
                     </div>

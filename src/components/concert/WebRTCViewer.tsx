@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { Radio, Wifi, WifiOff, VideoOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface WebRTCViewerProps {
   roomId: string;
@@ -21,6 +22,7 @@ export const WebRTCViewer = ({
   onError,
 }: WebRTCViewerProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const { t } = useLanguage();
   const [hasRemoteStream, setHasRemoteStream] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
   // Track if remote video is actually active — driven by track events, not per-render inspection.
@@ -219,8 +221,8 @@ export const WebRTCViewer = ({
                   <AvatarImage src={artistAvatarUrl || ""} />
                   <AvatarFallback className="text-xl">{artistName?.charAt(0) || "?"}</AvatarFallback>
                 </Avatar>
-                <p className="text-foreground text-xl font-bold">En attente du direct</p>
-                <p className="text-muted-foreground">L'artiste n'a pas encore commencé le stream</p>
+                <p className="text-foreground text-xl font-bold">{t("waitingForLive")}</p>
+                <p className="text-muted-foreground">{t("waitingForLiveHint")}</p>
               </>
             )}
           </div>

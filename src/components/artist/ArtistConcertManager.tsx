@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Calendar, Ticket, DollarSign, Users, Video, Play, Trash2, Edit } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface ArtistConcertManagerProps {
   userId: string;
@@ -29,10 +31,15 @@ interface Concert {
   status: string;
   stream_url: string | null;
   cover_image_url: string | null;
+  approval_status?: string;
+  allows_dedications?: boolean;
+  allows_sponsor_ads?: boolean;
 }
 
 export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -48,7 +55,9 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
     ticket_price: "",
     max_tickets: "",
     cover_image_url: "",
-    stream_url: ""
+    stream_url: "",
+    allows_dedications: true,
+    allows_sponsor_ads: true,
   });
 
   useEffect(() => {
@@ -96,8 +105,10 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
             ticket_price: parseFloat(formData.ticket_price) || 0,
             max_tickets: formData.max_tickets ? parseInt(formData.max_tickets) : null,
             cover_image_url: formData.cover_image_url || null,
-            stream_url: formData.stream_url || null
-          })
+            stream_url: formData.stream_url || null,
+            allows_dedications: formData.allows_dedications,
+            allows_sponsor_ads: formData.allows_sponsor_ads,
+          } as any)
           .eq("id", editingConcert.id);
 
         if (error) throw error;
@@ -117,8 +128,10 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
             ticket_price: parseFloat(formData.ticket_price) || 0,
             max_tickets: formData.max_tickets ? parseInt(formData.max_tickets) : null,
             cover_image_url: formData.cover_image_url || null,
-            stream_url: formData.stream_url || null
-          });
+            stream_url: formData.stream_url || null,
+            allows_dedications: formData.allows_dedications,
+            allows_sponsor_ads: formData.allows_sponsor_ads,
+          } as any);
 
         if (error) throw error;
 
@@ -128,7 +141,7 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
         });
       }
 
-      setFormData({ title: "", description: "", scheduled_date: "", ticket_price: "", max_tickets: "", cover_image_url: "", stream_url: "" });
+      setFormData({ title: "", description: "", scheduled_date: "", ticket_price: "", max_tickets: "", cover_image_url: "", stream_url: "", allows_dedications: true, allows_sponsor_ads: true });
       setEditingConcert(null);
       setIsDialogOpen(false);
       loadConcerts();
@@ -233,6 +246,21 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
                 <Input id="stream_url" value={formData.stream_url} onChange={(e) => setFormData({...formData, stream_url: e.target.value})} placeholder={t("artConcertStreamPlaceholder")} />
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg border bg-muted/30">
+                <label className="flex items-center justify-between gap-2 cursor-pointer">
+                  <span className="text-sm">{t("artConcertAcceptDedications")}</span>
+                  <input type="checkbox" checked={formData.allows_dedications}
+                    onChange={(e) => setFormData({...formData, allows_dedications: e.target.checked})}
+                    className="h-4 w-4" />
+                </label>
+                <label className="flex items-center justify-between gap-2 cursor-pointer">
+                  <span className="text-sm">{t("artConcertAcceptAds")}</span>
+                  <input type="checkbox" checked={formData.allows_sponsor_ads}
+                    onChange={(e) => setFormData({...formData, allows_sponsor_ads: e.target.checked})}
+                    className="h-4 w-4" />
+                </label>
+              </div>
+
               <Button type="submit" disabled={saving} className="w-full">
                 {saving ? t("artConcertCreating") : t("artConcertCreate")}
               </Button>
@@ -259,27 +287,33 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
         <Card className="bg-gradient-to-br from-purple-500/10 to-pink-500/5 border-purple-500/20">
           <CardContent className="pt-6 text-center">
             <DollarSign className="w-8 h-8 mx-auto mb-2 text-purple-500" />
-            <p className="text-3xl font-bold">{totalRevenue.toFixed(2)}€</p>
+            <p className="text-3xl font-bold">${totalRevenue.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground">{t("artConcertTotalRevenue")}</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="max-h-[70vh] overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-6">
         {concerts.map((concert) => (
           <Card key={concert.id} className="overflow-hidden">
             {concert.cover_image_url && (
               <div className="h-40 bg-cover bg-center" style={{ backgroundImage: `url(${concert.cover_image_url})` }} />
             )}
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <CardTitle className="text-lg">{concert.title}</CardTitle>
-                {getStatusBadge(concert.status)}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {concert.approval_status === "pending" && (
+                    <Badge variant="outline" className="border-amber-500 text-amber-500">{t("concertStatusPendingValidation")}</Badge>
+                  )}
+                  {concert.approval_status === "rejected" && (
+                    <Badge variant="destructive">{t("concertStatusRejected")}</Badge>
+                  )}
+                  {getStatusBadge(concert.status)}
+                </div>
               </div>
               <CardDescription>
-                {new Date(concert.scheduled_date).toLocaleDateString("fr-FR", {
-                  weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
-                })}
+                {formatTz(concert.scheduled_date, "EEEE d MMMM yyyy HH:mm", { timezone: tz, language })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -289,7 +323,7 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
               
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="p-2 bg-muted/50 rounded">
-                  <p className="text-lg font-bold">{concert.ticket_price}€</p>
+                  <p className="text-lg font-bold">${concert.ticket_price}</p>
                   <p className="text-xs text-muted-foreground">{t("artConcertPrice")}</p>
                 </div>
                 <div className="p-2 bg-muted/50 rounded">
@@ -297,7 +331,7 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
                   <p className="text-xs text-muted-foreground">{t("artConcertSold")}</p>
                 </div>
                 <div className="p-2 bg-muted/50 rounded">
-                  <p className="text-lg font-bold">{Number(concert.revenue).toFixed(0)}€</p>
+                  <p className="text-lg font-bold">${Number(concert.revenue).toFixed(0)}</p>
                   <p className="text-xs text-muted-foreground">{t("artConcertRevenue")}</p>
                 </div>
               </div>
@@ -317,7 +351,9 @@ export const ArtistConcertManager = ({ userId }: ArtistConcertManagerProps) => {
                         ticket_price: String(concert.ticket_price),
                         max_tickets: concert.max_tickets ? String(concert.max_tickets) : "",
                         cover_image_url: concert.cover_image_url || "",
-                        stream_url: concert.stream_url || ""
+                        stream_url: concert.stream_url || "",
+                        allows_dedications: concert.allows_dedications ?? true,
+                        allows_sponsor_ads: concert.allows_sponsor_ads ?? true,
                       });
                       setIsDialogOpen(true);
                     }}>

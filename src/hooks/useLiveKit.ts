@@ -360,17 +360,60 @@ export const useLiveKit = ({
     const room = roomRef.current;
     if (!room) return null;
 
-    const newFacingMode = currentFacingMode === "user" ? "environment" : "user";
+    const newFacingMode: "user" | "environment" = currentFacingMode === "user" ? "environment" : "user";
 
     try {
-      // Disable current camera, then re-enable with new facing mode
-      await room.localParticipant.setCameraEnabled(false);
-      await room.localParticipant.setCameraEnabled(true, {
-        facingMode: newFacingMode,
-        resolution: VideoPresets.h720.resolution,
+      // 1. Enumerate video devices
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+      console.log("[LiveKit] Available cameras:", videoDevices.map((d) => d.label));
+
+      // 2. Find the device matching the new facing mode (heuristic on label)
+      const wantBack = newFacingMode === "environment";
+      const matchByLabel = videoDevices.find((d) => {
+        const label = d.label.toLowerCase();
+        return wantBack
+          ? /(back|rear|environment|arrière|arriere|trasera)/i.test(label)
+          : /(front|user|face|avant|frontal)/i.test(label);
       });
 
-      // Rebuild local stream
+      // 3. Get current device id to pick a different one as fallback
+      const currentTrack = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+      const currentDeviceId = currentTrack?.mediaStreamTrack?.getSettings().deviceId;
+      const fallback = videoDevices.find((d) => d.deviceId && d.deviceId !== currentDeviceId);
+
+      const targetDevice = matchByLabel || fallback;
+
+      if (videoDevices.length < 2 && !matchByLabel) {
+        console.warn("[LiveKit] No second camera detected on this device");
+        onErrorRef.current?.("Aucune autre caméra détectée sur cet appareil");
+        return null;
+      }
+
+      // 4. Try switchActiveDevice first (cleanest, keeps publication alive)
+      if (targetDevice?.deviceId) {
+        try {
+          await room.switchActiveDevice("videoinput", targetDevice.deviceId);
+          console.log("[LiveKit] Switched to camera:", targetDevice.label);
+        } catch (switchErr) {
+          console.warn("[LiveKit] switchActiveDevice failed, falling back to republish:", switchErr);
+          // Fallback: republish camera with deviceId constraint
+          await room.localParticipant.setCameraEnabled(false);
+          await room.localParticipant.setCameraEnabled(true, {
+            deviceId: { exact: targetDevice.deviceId },
+            resolution: VideoPresets.h720.resolution,
+          });
+        }
+      } else {
+        // No deviceId available — fall back to facingMode constraint
+        await room.localParticipant.setCameraEnabled(false);
+        await room.localParticipant.setCameraEnabled(true, {
+          facingMode: newFacingMode,
+          resolution: VideoPresets.h720.resolution,
+        });
+      }
+
+      // 5. Rebuild local stream
       const stream = buildLocalStream();
       if (stream) {
         setLocalStream(stream);
@@ -379,7 +422,7 @@ export const useLiveKit = ({
       }
     } catch (err) {
       console.error("[LiveKit] Switch camera failed:", err);
-      await room.localParticipant.setCameraEnabled(true);
+      try { await room.localParticipant.setCameraEnabled(true); } catch {}
     }
 
     return null;

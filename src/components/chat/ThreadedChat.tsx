@@ -8,8 +8,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Send, MessageCircle, Shield, Smile, Reply, X } from "lucide-react";
+import { Send, MessageCircle, Shield, Smile, Reply, X, Ban } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useStreamBan, StreamType } from "@/hooks/useStreamBan";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ChatMessage {
   id: string;
@@ -27,6 +29,13 @@ interface ThreadedChatProps {
   chatType: "duel" | "concert" | "live";
   entityId: string;
   participants?: { id: string; name: string }[];
+  /**
+   * Identifier of the user allowed to ban people from this stream:
+   * - duel: manager_id
+   * - live / concert: artist_id (host)
+   * When provided AND equals the current user, ban controls become available.
+   */
+  hostId?: string | null;
 }
 
 const BAD_WORDS = ["spam", "scam", "idiot", "stupid", "hate", "kill"];
@@ -42,7 +51,7 @@ const TABLE_MAP = {
   live: { table: "live_chat_messages", idCol: "live_id" },
 } as const;
 
-export const ThreadedChat = ({ chatType, entityId, participants = [] }: ThreadedChatProps) => {
+export const ThreadedChat = ({ chatType, entityId, participants = [], hostId }: ThreadedChatProps) => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -50,11 +59,20 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
   const [sending, setSending] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [banTarget, setBanTarget] = useState<ChatMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { table, idCol } = TABLE_MAP[chatType];
+
+  const { bannedIds, isCurrentUserBanned, banUser } = useStreamBan({
+    streamType: chatType as StreamType,
+    streamId: entityId,
+    currentUserId: currentUser?.id,
+  });
+
+  const canModerate = !!currentUser && !!hostId && currentUser.id === hostId;
 
   useEffect(() => {
     loadMessages();
@@ -174,6 +192,11 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
       return;
     }
 
+    if (isCurrentUserBanned) {
+      toast({ title: t("youAreBanned"), variant: "destructive" });
+      return;
+    }
+
     if (containsBadWords(newMessage)) {
       toast({ title: t("messageRefused"), description: t("inappropriateContent"), variant: "destructive" });
       return;
@@ -201,6 +224,13 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
     }
   };
 
+  const confirmBan = async () => {
+    if (!banTarget) return;
+    const ok = await banUser(banTarget.user_id, banTarget.message.slice(0, 200));
+    if (ok) toast({ title: t("userBannedSuccess") });
+    setBanTarget(null);
+  };
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString(language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
   };
@@ -216,6 +246,8 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
     );
   };
 
+  const visibleMessages = messages.filter(m => !bannedIds.has(m.user_id));
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="py-3 border-b">
@@ -230,7 +262,7 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
       <CardContent className="flex-1 p-0 flex flex-col min-h-0">
         <ScrollArea className="flex-1 p-4 overflow-x-hidden scrollbar-hidden" ref={scrollRef}>
           <AnimatePresence>
-            {messages.map((msg) => (
+            {visibleMessages.map((msg) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -265,9 +297,19 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
                     <button
                       onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+                      title={t("reply")}
                     >
                       <Reply className="w-3 h-3" />
                     </button>
+                    {canModerate && msg.user_id !== currentUser?.id && (
+                      <button
+                        onClick={() => setBanTarget(msg)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        title={t("banUserLabel")}
+                      >
+                        <Ban className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                   <p className="text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{renderMessageText(msg.message)}</p>
                 </div>
@@ -275,7 +317,7 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
             ))}
           </AnimatePresence>
 
-          {messages.length === 0 && (
+          {visibleMessages.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
               <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t("beFirstToSendMessage")}</p>
@@ -300,7 +342,7 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
         <form onSubmit={handleSend} className="p-3 border-t flex gap-2 items-center">
           <Popover>
             <PopoverTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className="shrink-0">
+              <Button type="button" variant="ghost" size="icon" className="shrink-0" disabled={isCurrentUserBanned}>
                 <Smile className="w-4 h-4" />
               </Button>
             </PopoverTrigger>
@@ -323,16 +365,32 @@ export const ThreadedChat = ({ chatType, entityId, participants = [] }: Threaded
             ref={inputRef}
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder={replyTo ? `${t("replyToPlaceholder")} ${replyTo.user_name}...` : "Message..."}
+            placeholder={
+              isCurrentUserBanned
+                ? t("youAreBanned")
+                : replyTo
+                  ? `${t("replyToPlaceholder")} ${replyTo.user_name}...`
+                  : "Message..."
+            }
             maxLength={200}
-            disabled={!currentUser}
+            disabled={!currentUser || isCurrentUserBanned}
             className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={sending || !currentUser}>
+          <Button type="submit" size="icon" disabled={sending || !currentUser || isCurrentUserBanned}>
             <Send className="w-4 h-4" />
           </Button>
         </form>
       </CardContent>
+
+      <ConfirmDialog
+        open={!!banTarget}
+        onOpenChange={(o) => !o && setBanTarget(null)}
+        title={t("banConfirmTitle")}
+        description={t("banConfirmDesc")}
+        confirmLabel={t("banUserLabel")}
+        variant="destructive"
+        onConfirm={confirmBan}
+      />
     </Card>
   );
 };

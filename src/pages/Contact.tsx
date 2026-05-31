@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SEO from "@/components/seo/SEO";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -9,10 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Mail, MapPin, Phone, Send } from "lucide-react";
 import { toast } from "sonner";
+import { usePlatformSetting, DEFAULT_CONTACT, ContactInfo } from "@/hooks/usePlatformSettings";
 
 const Contact = () => {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
+  const { data: contact } = usePlatformSetting<ContactInfo>("contact_info", DEFAULT_CONTACT);
+  const c = { ...DEFAULT_CONTACT, ...(contact || {}) };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -28,6 +32,7 @@ const Contact = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Contact — Duel Music" description="Contactez l'équipe Duel Music. Support, partenariats, presse." path="/contact" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">
@@ -100,8 +105,8 @@ const Contact = () => {
                     <div>
                       <h3 className="font-semibold text-foreground mb-1">{t("emailUs")}</h3>
                       <p className="text-muted-foreground text-sm mb-2">{t("emailUsDesc")}</p>
-                      <a href="mailto:contact@duelmusic.com" className="text-primary hover:underline">
-                        contact@duelmusic.com
+                      <a href={`mailto:${c.email}`} className="text-primary hover:underline break-all">
+                        {c.email}
                       </a>
                     </div>
                   </div>
@@ -117,7 +122,7 @@ const Contact = () => {
                     <div>
                       <h3 className="font-semibold text-foreground mb-1">{t("callUs")}</h3>
                       <p className="text-muted-foreground text-sm mb-2">{t("callUsDesc")}</p>
-                      <span className="text-primary">+33 1 23 45 67 89</span>
+                      <a href={`tel:${c.phone.replace(/\s+/g, '')}`} className="text-primary hover:underline">{c.phone}</a>
                     </div>
                   </div>
                 </CardContent>
@@ -132,9 +137,8 @@ const Contact = () => {
                     <div>
                       <h3 className="font-semibold text-foreground mb-1">{t("visitUs")}</h3>
                       <p className="text-muted-foreground text-sm mb-2">{t("visitUsDesc")}</p>
-                      <address className="text-primary not-italic">
-                        123 Avenue de la Musique<br />
-                        75001 Paris, France
+                      <address className="text-primary not-italic whitespace-pre-line">
+                        {c.address}
                       </address>
                     </div>
                   </div>

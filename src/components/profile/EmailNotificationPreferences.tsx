@@ -105,10 +105,25 @@ export const EmailNotificationPreferences = ({ userRoles }: EmailNotificationPre
     setPushLoading(true);
     try {
       if (enable) {
+        const { data: cfg } = await supabase.from("platform_settings").select("value").eq("key", "push_config").maybeSingle();
+        const vapidKey = (cfg?.value as any)?.vapid_public_key as string | undefined;
+        if (!vapidKey) {
+          toast({ title: t("error"), description: t("profilePushNotConfigured"), variant: "destructive" });
+          setPushLoading(false);
+          return;
+        }
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
           const reg = await navigator.serviceWorker.ready;
-          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: undefined });
+          const urlBase64ToUint8Array = (base64: string) => {
+            const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+            const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+            const raw = atob(b64);
+            const out = new Uint8Array(raw.length);
+            for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+            return out;
+          };
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
           if (userId) {
             const subJson = sub.toJSON();
             await supabase.from("push_subscriptions").upsert({ user_id: userId, endpoint: sub.endpoint, p256dh: subJson.keys?.p256dh || "", auth: subJson.keys?.auth || "" }, { onConflict: "user_id" });
@@ -126,9 +141,9 @@ export const EmailNotificationPreferences = ({ userRoles }: EmailNotificationPre
         setPushEnabled(false);
         toast({ title: t("profilePushDeactivated"), description: t("profilePushDeactivatedDesc") });
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Push toggle error:", err);
-      toast({ title: t("error"), description: t("profilePushError"), variant: "destructive" });
+      toast({ title: t("error"), description: err?.message || t("profilePushError"), variant: "destructive" });
     }
     setPushLoading(false);
   };
@@ -187,7 +202,8 @@ export const EmailNotificationPreferences = ({ userRoles }: EmailNotificationPre
         <CardContent className="space-y-3">
           {visibleItems.map((item) => {
             const Icon = item.icon;
-            const enabled = prefs[item.key];
+            const isLocked = "locked" in item && item.locked;
+            const enabled = isLocked ? true : prefs[item.key];
             return (
               <div key={item.key} className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${enabled ? "border-border bg-accent/20" : "border-border/50 bg-muted/20"}`}>
                 <div className="flex items-center gap-3">
@@ -197,15 +213,15 @@ export const EmailNotificationPreferences = ({ userRoles }: EmailNotificationPre
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-sm">{item.label}</span>
-                      {"locked" in item && item.locked && <Badge variant="secondary" className="text-xs py-0">{t("profileEmailRequired")}</Badge>}
+                      {isLocked && <Badge variant="secondary" className="text-xs py-0">{t("profileEmailRequired")}</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">{item.description}</p>
                   </div>
                 </div>
                 <Switch
                   checked={enabled}
-                  onCheckedChange={(val) => !("locked" in item && item.locked) && handleToggle(item.key, val)}
-                  disabled={("locked" in item && item.locked) || saving}
+                  onCheckedChange={(val) => !isLocked && handleToggle(item.key, val)}
+                  disabled={isLocked || saving}
                 />
               </div>
             );

@@ -7,13 +7,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Send, MessageCircle, Shield, Smile, Reply, X } from "lucide-react";
+import { Send, MessageCircle, Shield, Smile, Reply, X, Ban } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useStreamBan } from "@/hooks/useStreamBan";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ChatMessage {
   id: string;
@@ -30,6 +32,8 @@ interface ChatMessage {
 interface LiveChatProps {
   duelId: string;
   participants?: { id: string; name: string }[];
+  /** Manager id of the duel — only this user (or admin) can ban from chat. */
+  managerId?: string | null;
 }
 
 const BAD_WORDS = ["spam", "scam", "idiot", "stupid", "hate", "kill"];
@@ -40,7 +44,7 @@ const containsBadWords = (text: string): boolean => {
 
 const EMOJI_REACTIONS = ["🔥", "❤️", "👏", "😂", "🎵", "💯", "🏆", "⭐", "🎤", "💎", "🦁", "👑"];
 
-export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
+export const LiveChat = ({ duelId, participants = [], managerId }: LiveChatProps) => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -50,8 +54,17 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [banTarget, setBanTarget] = useState<ChatMessage | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { bannedIds, isCurrentUserBanned, banUser } = useStreamBan({
+    streamType: "duel",
+    streamId: duelId,
+    currentUserId: currentUser?.id,
+  });
+
+  const canModerate = !!currentUser && !!managerId && currentUser.id === managerId;
 
   useEffect(() => {
     loadMessages();
@@ -173,6 +186,11 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
       return;
     }
 
+    if (isCurrentUserBanned) {
+      toast({ title: t("youAreBanned"), variant: "destructive" });
+      return;
+    }
+
     if (containsBadWords(newMessage)) {
       toast({ title: t("messageRefused"), description: t("inappropriateContent"), variant: "destructive" });
       return;
@@ -194,6 +212,13 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
     }
   };
 
+  const confirmBan = async () => {
+    if (!banTarget) return;
+    const ok = await banUser(banTarget.user_id, banTarget.message.slice(0, 200));
+    if (ok) toast({ title: t("userBannedSuccess") });
+    setBanTarget(null);
+  };
+
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString(language === "fr" ? "fr-FR" : "en-US", { hour: "2-digit", minute: "2-digit" });
   };
@@ -209,9 +234,11 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
     );
   };
 
+  const visibleMessages = messages.filter(m => !bannedIds.has(m.user_id));
+
   const allMentionable = [
     ...participants,
-    ...messages
+    ...visibleMessages
       .filter(m => !participants.find(p => p.id === m.user_id))
       .map(m => ({ id: m.user_id, name: m.user_name || t("userDefault") }))
       .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
@@ -231,13 +258,13 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
       <CardContent className="flex-1 p-0 flex flex-col min-h-0">
         <ScrollArea className="flex-1 p-4" ref={scrollRef}>
           <AnimatePresence>
-            {messages.map((msg) => (
+            {visibleMessages.map((msg) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="flex items-start gap-2 mb-3"
+                className="flex items-start gap-2 mb-3 group"
               >
                 <Avatar className="w-8 h-8 shrink-0">
                   <AvatarImage src={msg.avatar_url || ""} />
@@ -254,6 +281,18 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">{formatTime(msg.created_at)}</span>
+                    {canModerate && msg.user_id !== currentUser?.id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 ml-auto opacity-0 group-hover:opacity-100 text-destructive"
+                        title={t("banUserLabel")}
+                        onClick={() => setBanTarget(msg)}
+                      >
+                        <Ban className="w-3 h-3" />
+                      </Button>
+                    )}
                   </div>
                   <p className="text-sm break-words">{renderMessage(msg.message)}</p>
                 </div>
@@ -261,7 +300,7 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
             ))}
           </AnimatePresence>
           
-          {messages.length === 0 && (
+          {visibleMessages.length === 0 && (
             <div className="text-center text-muted-foreground py-8">
               <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>{t("beFirstToSendMessage")}</p>
@@ -299,7 +338,7 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
         <form onSubmit={handleSend} className="p-3 border-t flex gap-2 items-center">
           <Popover>
             <PopoverTrigger asChild>
-              <Button type="button" variant="ghost" size="icon" className="shrink-0">
+              <Button type="button" variant="ghost" size="icon" className="shrink-0" disabled={isCurrentUserBanned}>
                 <Smile className="w-4 h-4" />
               </Button>
             </PopoverTrigger>
@@ -322,16 +361,26 @@ export const LiveChat = ({ duelId, participants = [] }: LiveChatProps) => {
             ref={inputRef}
             value={newMessage}
             onChange={handleInputChange}
-            placeholder={t("messagePlaceholder")}
+            placeholder={isCurrentUserBanned ? t("youAreBanned") : t("messagePlaceholder")}
             maxLength={200}
-            disabled={!currentUser}
+            disabled={!currentUser || isCurrentUserBanned}
             className="flex-1"
           />
-          <Button type="submit" size="icon" disabled={sending || !currentUser}>
+          <Button type="submit" size="icon" disabled={sending || !currentUser || isCurrentUserBanned}>
             <Send className="w-4 h-4" />
           </Button>
         </form>
       </CardContent>
+
+      <ConfirmDialog
+        open={!!banTarget}
+        onOpenChange={(o) => !o && setBanTarget(null)}
+        title={t("banConfirmTitle")}
+        description={t("banConfirmDesc")}
+        confirmLabel={t("banUserLabel")}
+        variant="destructive"
+        onConfirm={confirmBan}
+      />
     </Card>
   );
 };

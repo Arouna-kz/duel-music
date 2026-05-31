@@ -12,9 +12,9 @@ interface QuickTipProps {
 }
 
 const TIP_AMOUNTS = [
-  { value: 1, label: "1€", emoji: "💰" },
-  { value: 5, label: "5€", emoji: "💎" },
-  { value: 10, label: "10€", emoji: "👑" },
+  { value: 1, label: "$1", emoji: "💰" },
+  { value: 5, label: "$5", emoji: "💎" },
+  { value: 10, label: "$10", emoji: "👑" },
 ];
 
 export const QuickTip = ({ duelId, recipientIds }: QuickTipProps) => {
@@ -42,16 +42,18 @@ export const QuickTip = ({ duelId, recipientIds }: QuickTipProps) => {
     });
 
     if (error || !success) {
+      const { purchaseErrorKey, purchaseErrorTitleKey } = await import("@/lib/purchaseErrors");
+      const code = error ? null : "insufficient_balance";
       toast({
-        title: error ? t("errorTitle") : t("insufficientBalanceShort"),
-        description: error ? t("cannotSendTip") : t("rechargeWalletShort"),
+        title: t(purchaseErrorTitleKey(code)),
+        description: error ? t("cannotSendTip") : t(purchaseErrorKey(code)),
         variant: "destructive",
       });
     } else {
       const recipientName = recipientIds.find(r => r.id === recipientId)?.name || t("artistDefault");
       setSentTip({ amount, recipient: recipientName });
       setTimeout(() => setSentTip(null), 2000);
-      toast({ title: `${t("tipSent")} ${amount}€`, description: `${t("sentTo")} ${recipientName}` });
+      toast({ title: `${t("tipSent")} $${amount}`, description: `${t("sentTo")} ${recipientName}` });
     }
 
     setSending(false);
@@ -69,7 +71,7 @@ export const QuickTip = ({ duelId, recipientIds }: QuickTipProps) => {
             className="absolute -top-8 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap"
           >
             <span className="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
-              💸 {sentTip.amount}€ → {sentTip.recipient}
+              💸 ${sentTip.amount} → {sentTip.recipient}
             </span>
           </motion.div>
         )}

@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ArrowLeft, Clock, Eye, Lock, Play, Heart, MessageCircle } from "lucide-react";
-import { format } from "date-fns";
-import { fr, enUS } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
 import { toast } from "sonner";
 import { useEffect, useState, useRef } from "react";
 import CommentSection from "@/components/comments/CommentSection";
+import SEO from "@/components/seo/SEO";
 
 const ReplayDetail = () => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -22,7 +23,8 @@ const ReplayDetail = () => {
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const queryClient = useQueryClient();
-  const dateLocale = language === "fr" ? fr : enUS;
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -107,8 +109,16 @@ const ReplayDetail = () => {
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
-      const { error } = await supabase.from("replay_access").insert({ replay_id: id, user_id: user.id });
-      if (error) throw error;
+      const { data, error } = await supabase.rpc("purchase_replay_access_from_wallet", {
+        p_user_id: user.id,
+        p_replay_id: id!,
+      });
+      if (error) throw new Error(error.message);
+      const result = data as { success?: boolean; error?: string };
+      if (!result?.success) {
+        const { purchaseErrorKey } = await import("@/lib/purchaseErrors");
+        throw new Error(t(purchaseErrorKey(result?.error)));
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["replay-access", id] });
@@ -151,6 +161,22 @@ const ReplayDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={`${(replay as any).title || "Replay"} — Duel Music`}
+        description={((replay as any).description || `Revivez ce moment sur Duel Music`).slice(0, 160)}
+        path={`/replay/${(replay as any).id}`}
+        image={(replay as any).thumbnail_url || undefined}
+        type="video.other"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "VideoObject",
+          name: (replay as any).title,
+          description: (replay as any).description || undefined,
+          thumbnailUrl: (replay as any).thumbnail_url || undefined,
+          uploadDate: (replay as any).created_at,
+          contentUrl: (replay as any).video_url,
+        }}
+      />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <Button variant="ghost" onClick={() => navigate(-1)} className="mb-8">
@@ -208,7 +234,7 @@ const ReplayDetail = () => {
                 <span>•</span>
                 <div className="flex items-center gap-1"><MessageCircle className="w-4 h-4" /><span>{formatCount(commentsCount)}</span></div>
                 <span>•</span>
-                <span>{format(new Date(replay.recorded_date), "dd MMMM yyyy", { locale: dateLocale })}</span>
+                <span>{formatTz(replay.recorded_date, "dd MMMM yyyy", { timezone: tz, language })}</span>
               </div>
             </div>
 
@@ -217,7 +243,7 @@ const ReplayDetail = () => {
                 <h3 className="font-semibold mb-4">{t("information")}</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between"><span className="text-muted-foreground">{t("duration")}</span><span className="font-medium">{replay.duration}</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">{t("recordingDate")}</span><span className="font-medium">{format(new Date(replay.recorded_date), "dd MMMM yyyy", { locale: dateLocale })}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">{t("recordingDate")}</span><span className="font-medium">{formatTz(replay.recorded_date, "dd MMMM yyyy", { timezone: tz, language })}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">{t("viewsCount")}</span><span className="font-medium">{formatCount(replay.views_count)}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">{t("access")}</span><Badge variant={replay.is_premium ? "default" : "secondary"}>{replay.is_premium ? "Premium" : t("free")}</Badge></div>
                 </div>

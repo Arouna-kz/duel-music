@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Eye, EyeOff, Search, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { Eye, EyeOff, Search, ArrowLeft, CheckCircle2, XCircle, Gift, Lock } from "lucide-react";
 import logoImg from "@/assets/logo.png";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES } from "@/data/countries";
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import WelcomeOnboarding from "@/components/onboarding/WelcomeOnboarding";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useReferralEnabled } from "@/hooks/usePlatformConfig";
 
 // Simple email regex validator
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -26,6 +28,8 @@ const Auth = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const refFromUrl = (searchParams.get("ref") || "").trim();
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -35,6 +39,7 @@ const Auth = () => {
   const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupReferralCode, setSignupReferralCode] = useState(refFromUrl);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState("FR");
@@ -47,6 +52,9 @@ const Auth = () => {
   const [countryOpen, setCountryOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingName, setOnboardingName] = useState("");
+
+  const { data: referralEnabled = true, isLoading: referralEnabledLoading } = useReferralEnabled();
+  const referralLocked = refFromUrl.length > 0 && referralEnabled;
 
   const isSignupEmailValid = EMAIL_REGEX.test(signupEmail);
   const showEmailError = signupEmailTouched && signupEmail.length > 0 && !isSignupEmailValid;
@@ -215,10 +223,12 @@ const Auth = () => {
             phone: signupPhone ? `${selectedCountry.dial}${signupPhone}` : null,
             country_code: countryCode,
             phone_country_code: selectedCountry.dial,
+            referral_code: referralEnabled ? (signupReferralCode.trim() || null) : null,
           },
           emailRedirectTo: `${window.location.origin}/`,
         },
       });
+
 
       if (error) throw error;
 
@@ -242,6 +252,8 @@ const Auth = () => {
   }
 
   return (
+    <>
+      <SEO title="Connexion / Inscription — Duel Music" description="Créez votre compte Duel Music ou connectez-vous pour voter, suivre des artistes et offrir des cadeaux." path="/auth" />
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
       <Card className="w-full max-w-md p-8 bg-card/50 backdrop-blur-lg border-border/50 shadow-elegant animate-fade-in">
         {/* Back to home */}
@@ -267,7 +279,7 @@ const Auth = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="login" className="w-full">
+        <Tabs defaultValue={referralLocked ? "signup" : "login"} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="login">{t("loginTab")}</TabsTrigger>
             <TabsTrigger value="signup">{t("signupTab")}</TabsTrigger>
@@ -502,7 +514,34 @@ const Auth = () => {
                 </div>
               </div>
 
-              {/* Terms & Privacy */}
+              {/* Referral code - hidden when admin disables referral system */}
+              {referralEnabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="signup-referral" className="flex items-center gap-2">
+                    <Gift className="w-4 h-4 text-primary" />
+                    {referralLocked ? t("referralCodeLocked") : t("referralCodeOptional")}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-referral"
+                      type="text"
+                      value={signupReferralCode}
+                      onChange={(e) => setSignupReferralCode(e.target.value.toUpperCase())}
+                      placeholder={t("referralCodePlaceholder")}
+                      className={`bg-background/50 ${referralLocked ? "pr-10 opacity-90 cursor-not-allowed" : ""}`}
+                      readOnly={referralLocked}
+                      disabled={referralLocked}
+                    />
+                    {referralLocked && (
+                      <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {referralLocked ? t("referralCodeFromLink") : t("referralCodeHelp")}
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-start gap-3 pt-1">
                 <Checkbox
                   id="accept-terms"
@@ -573,6 +612,7 @@ const Auth = () => {
         )}
       </Card>
     </div>
+    </>
   );
 };
 

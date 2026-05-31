@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -6,9 +7,13 @@ import Footer from "@/components/Footer";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Medal, TrendingUp, Gift, Swords, Crown, Heart, Calendar, Star } from "lucide-react";
+import { Trophy, Medal, TrendingUp, Gift, Swords, Crown, Heart, Calendar, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
+import { LiveSeasonLeaderboard } from "@/components/leaderboard/LiveSeasonLeaderboard";
 
 interface LeaderboardEntry {
   user_id: string;
@@ -68,7 +73,9 @@ interface SeasonWinner {
 
 const Leaderboard = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [artists, setArtists] = useState<LeaderboardEntry[]>([]);
   const [donors, setDonors] = useState<DonorEntry[]>([]);
   const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
@@ -77,6 +84,10 @@ const Leaderboard = () => {
   const [seasonWinners, setSeasonWinners] = useState<SeasonWinner[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("artists");
+  const [seasonsSubTab, setSeasonsSubTab] = useState<"active" | "ended">("active");
+  const [activeSeasonsPage, setActiveSeasonsPage] = useState(1);
+  const [endedSeasonsPage, setEndedSeasonsPage] = useState(1);
+  const SEASONS_PAGE_SIZE = 5;
 
   useEffect(() => {
     Promise.all([loadArtistLeaderboard(), loadDonorLeaderboard(), loadSeasons()])
@@ -233,9 +244,10 @@ const Leaderboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <div className="container mx-auto px-4 pt-24 pb-16 flex items-center justify-center py-20">
+      <div className="min-h-screen bg-background flex flex-col">
+        <SEO title="Classement des artistes — Duel Music" description="Top artistes, fans et donateurs de la saison. Suivez le podium en direct sur Duel Music." path="/leaderboard" />
+      <Header />
+        <div className="flex-1 container mx-auto px-4 pt-24 pb-16 flex items-center justify-center min-h-[60vh]">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
         <Footer />
@@ -247,9 +259,9 @@ const Leaderboard = () => {
   const donorPodium = donors.slice(0, 3).map(d => ({ name: d.full_name || t("donorDefault"), avatar: d.avatar_url, score: d.total_donated, id: d.user_id }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header />
-      <main className="container mx-auto px-4 pt-24 pb-16">
+      <main className="flex-1 container mx-auto px-4 pt-24 pb-16 min-h-[80vh]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -347,107 +359,171 @@ const Leaderboard = () => {
 
             {/* Seasons Tab */}
             <TabsContent value="seasons">
-              <div className="space-y-6">
-                {seasons.length === 0 ? (
-                  <Card className="p-8 text-center text-muted-foreground">{t("noSeasonsYet")}</Card>
-                ) : (
-                  seasons.map(season => {
-                    const now = new Date();
-                    const start = new Date(season.start_date);
-                    const end = new Date(season.end_date);
-                    const isActive = now >= start && now <= end && season.is_active;
-                    const isPast = now > end;
-                    const seasonRewards = rewards.filter(r => r.season_id === season.id).sort((a, b) => a.rank_position - b.rank_position);
+              {(() => {
+                const now = new Date();
+                const activeSeasons = seasons.filter(s => {
+                  const start = new Date(s.start_date);
+                  const end = new Date(s.end_date);
+                  return now >= start && now <= end && s.is_active;
+                });
+                const endedSeasons = seasons.filter(s => new Date(s.end_date) < now);
 
-                    return (
-                      <Card key={season.id} className={`overflow-hidden ${isActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}>
-                        <div className="p-6">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <h3 className="font-bold text-lg text-foreground">{season.name}</h3>
-                                {isActive && <Badge className="bg-green-500/20 text-green-400 border-green-500/30">{t("seasonActive")}</Badge>}
-                                {isPast && <Badge variant="secondary">{t("seasonEnded")}</Badge>}
-                                {!isActive && !isPast && <Badge variant="outline">{t("seasonUpcoming")}</Badge>}
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {season.type === "artist" ? t("seasonTypeArtist") : t("seasonTypeDonor")}
-                              </Badge>
+                const renderSeasonCard = (season: SeasonInfo) => {
+                  const start = new Date(season.start_date);
+                  const end = new Date(season.end_date);
+                  const isActive = now >= start && now <= end && season.is_active;
+                  const isPast = now > end;
+                  const seasonRewards = rewards.filter(r => r.season_id === season.id).sort((a, b) => a.rank_position - b.rank_position);
+
+                  return (
+                    <Card key={season.id} className={`overflow-hidden ${isActive ? "ring-2 ring-primary/50 bg-primary/5" : ""}`}>
+                      <div className="p-6">
+                        <div className="flex items-start justify-between mb-3 gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <h3 className="font-bold text-lg text-foreground">{season.name}</h3>
+                              {isActive && <Badge className="bg-green-500/20 text-green-400 border-green-500/30">{t("seasonActive")}</Badge>}
+                              {isPast && <Badge variant="secondary">{t("seasonEnded")}</Badge>}
+                              {!isActive && !isPast && <Badge variant="outline">{t("seasonUpcoming")}</Badge>}
                             </div>
-                            <div className="text-right text-sm text-muted-foreground">
-                              <p>{new Date(season.start_date).toLocaleDateString("fr-FR")}</p>
-                              <p>→ {new Date(season.end_date).toLocaleDateString("fr-FR")}</p>
+                            <Badge variant="outline" className="text-xs">
+                              {season.type === "artist" ? t("seasonTypeArtist") : t("seasonTypeDonor")}
+                            </Badge>
+                          </div>
+                          <div className="text-right text-xs sm:text-sm text-muted-foreground shrink-0">
+                            <p>{formatTz(season.start_date, "d MMM yyyy HH:mm", { timezone: tz, language })}</p>
+                            <p>→ {formatTz(season.end_date, "d MMM yyyy HH:mm", { timezone: tz, language })}</p>
+                          </div>
+                        </div>
+
+                        {isActive && (
+                          <div className="mt-3 mb-4">
+                            <div className="w-full bg-muted rounded-full h-2">
+                              <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(100, ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100)}%` }} />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} {t("daysRemaining")}
+                            </p>
+                          </div>
+                        )}
+
+                        {seasonRewards.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                              <Star className="w-4 h-4 text-yellow-500" /> {t("seasonRewardsTitle")}
+                            </h4>
+                            <div className="space-y-2">
+                              {seasonRewards.map(reward => (
+                                <div key={reward.id} className={`flex items-center gap-3 p-3 rounded-lg ${reward.rank_position <= 3 ? getRankStyle(reward.rank_position) : "bg-muted/30"}`}>
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
+                                    {getRankIcon(reward.rank_position)}
+                                  </div>
+                                  <span className="text-sm font-medium w-8">#{reward.rank_position}</span>
+                                  <span className="text-sm flex-1">
+                                    {getRewardDisplay(reward, season.is_mystery_reward, isPast)}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
                           </div>
+                        )}
 
-                          {/* Progress bar for active seasons */}
-                          {isActive && (
-                            <div className="mt-3 mb-4">
-                              <div className="w-full bg-muted rounded-full h-2">
-                                <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(100, ((now.getTime() - start.getTime()) / (end.getTime() - start.getTime())) * 100)}%` }} />
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} {t("daysRemaining")}
-                              </p>
-                            </div>
-                          )}
+                        {(isActive || isPast) && (
+                          <div className="mt-4 border-t border-border pt-4">
+                            <LiveSeasonLeaderboard
+                              seasonId={season.id}
+                              seasonType={season.type}
+                              rewards={seasonRewards.map(r => ({ rank_position: r.rank_position, reward_type: r.reward_type, credits_amount: r.credits_amount, physical_description: r.physical_description }))}
+                              isMystery={season.is_mystery_reward}
+                              isPast={isPast}
+                            />
+                          </div>
+                        )}
 
-                          {/* Rewards by rank */}
-                          {seasonRewards.length > 0 && (
-                            <div className="mt-4">
+                        {isPast && (() => {
+                          const sw = seasonWinners.filter(w => w.season_id === season.id);
+                          if (sw.length === 0) return null;
+                          return (
+                            <div className="mt-4 border-t border-border pt-4">
                               <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                <Star className="w-4 h-4 text-yellow-500" /> {t("seasonRewardsTitle")}
+                                <Trophy className="w-4 h-4 text-primary" /> {t("seasonWinnersHeading")}
                               </h4>
                               <div className="space-y-2">
-                                {seasonRewards.map(reward => (
-                                  <div key={reward.id} className={`flex items-center gap-3 p-3 rounded-lg ${reward.rank_position <= 3 ? getRankStyle(reward.rank_position) : "bg-muted/30"}`}>
-                                    <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
-                                      {getRankIcon(reward.rank_position)}
+                                {sw.map(winner => {
+                                  const reward = seasonRewards.find(r => r.rank_position === winner.rank_position);
+                                  return (
+                                    <div key={winner.id} className={`flex items-center gap-3 p-3 rounded-lg ${winner.rank_position <= 3 ? getRankStyle(winner.rank_position) : "bg-muted/30"}`}>
+                                      <div className="w-8 flex justify-center">{getRankIcon(winner.rank_position)}</div>
+                                      <Avatar className="w-8 h-8">
+                                        <AvatarImage src={winner.avatar_url || ""} />
+                                        <AvatarFallback>{(winner.user_name || "?")[0]}</AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm font-medium flex-1 truncate">{winner.user_name}</span>
+                                      {reward && <span className="text-xs text-muted-foreground">{getRewardDisplay(reward, false, true)}</span>}
                                     </div>
-                                    <span className="text-sm font-medium w-8">#{reward.rank_position}</span>
-                                    <span className="text-sm flex-1">
-                                      {getRewardDisplay(reward, season.is_mystery_reward, isPast)}
-                                    </span>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
-                          )}
+                          );
+                        })()}
+                      </div>
+                    </Card>
+                  );
+                };
 
-                          {/* Winners display for past seasons */}
-                          {isPast && (() => {
-                            const sw = seasonWinners.filter(w => w.season_id === season.id);
-                            if (sw.length === 0) return null;
-                            return (
-                              <div className="mt-4 border-t border-border pt-4">
-                                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                                  <Trophy className="w-4 h-4 text-primary" /> {t("seasonWinnersHeading")}
-                                </h4>
-                                <div className="space-y-2">
-                                  {sw.map(winner => {
-                                    const reward = seasonRewards.find(r => r.rank_position === winner.rank_position);
-                                    return (
-                                      <div key={winner.id} className={`flex items-center gap-3 p-3 rounded-lg ${winner.rank_position <= 3 ? getRankStyle(winner.rank_position) : "bg-muted/30"}`}>
-                                        <div className="w-8 flex justify-center">{getRankIcon(winner.rank_position)}</div>
-                                        <Avatar className="w-8 h-8">
-                                          <AvatarImage src={winner.avatar_url || ""} />
-                                          <AvatarFallback>{(winner.user_name || "?")[0]}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="text-sm font-medium flex-1 truncate">{winner.user_name}</span>
-                                        {reward && <span className="text-xs text-muted-foreground">{getRewardDisplay(reward, false, true)}</span>}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </Card>
-                    );
-                  })
-                )}
-              </div>
+                const Pager = ({ page, setPage, total }: { page: number; setPage: (p: number) => void; total: number }) => {
+                  const totalPages = Math.max(1, Math.ceil(total / SEASONS_PAGE_SIZE));
+                  if (totalPages <= 1) return null;
+                  return (
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(Math.max(1, page - 1))}>
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <span className="text-sm text-muted-foreground px-3">{page} / {totalPages}</span>
+                      <Button variant="outline" size="sm" disabled={page === totalPages} onClick={() => setPage(Math.min(totalPages, page + 1))}>
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  );
+                };
+
+                if (seasons.length === 0) {
+                  return <Card className="p-8 text-center text-muted-foreground">{t("noSeasonsYet")}</Card>;
+                }
+
+                const activePage = activeSeasons.slice((activeSeasonsPage - 1) * SEASONS_PAGE_SIZE, activeSeasonsPage * SEASONS_PAGE_SIZE);
+                const endedPage = endedSeasons.slice((endedSeasonsPage - 1) * SEASONS_PAGE_SIZE, endedSeasonsPage * SEASONS_PAGE_SIZE);
+
+                return (
+                  <Tabs value={seasonsSubTab} onValueChange={(v) => setSeasonsSubTab(v as "active" | "ended")}>
+                    <TabsList className="grid w-full grid-cols-2 mb-6">
+                      <TabsTrigger value="active">{t("tabLive")} ({activeSeasons.length})</TabsTrigger>
+                      <TabsTrigger value="ended">{t("seasonEnded")} ({endedSeasons.length})</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="active">
+                      {activeSeasons.length === 0 ? (
+                        <Card className="p-8 text-center text-muted-foreground">{t("noSeasonsYet")}</Card>
+                      ) : (
+                        <>
+                          <div className="space-y-6">{activePage.map(renderSeasonCard)}</div>
+                          <Pager page={activeSeasonsPage} setPage={setActiveSeasonsPage} total={activeSeasons.length} />
+                        </>
+                      )}
+                    </TabsContent>
+                    <TabsContent value="ended">
+                      {endedSeasons.length === 0 ? (
+                        <Card className="p-8 text-center text-muted-foreground">{t("noSeasonsYet")}</Card>
+                      ) : (
+                        <>
+                          <div className="space-y-6">{endedPage.map(renderSeasonCard)}</div>
+                          <Pager page={endedSeasonsPage} setPage={setEndedSeasonsPage} total={endedSeasons.length} />
+                        </>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                );
+              })()}
             </TabsContent>
           </Tabs>
         </div>

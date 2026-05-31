@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Video, Eye, Trash2, Heart, MessageSquare } from "lucide-react";
 
 interface LifestyleVideo {
@@ -23,7 +25,9 @@ interface LifestyleVideo {
 
 const LifestyleManager = () => {
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [videos, setVideos] = useState<LifestyleVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +45,7 @@ const LifestyleManager = () => {
     loadVideos();
   };
 
-  const fmt = (dt: string) => new Date(dt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmt = (dt: string) => formatTz(dt, "dd MMM yyyy HH:mm", { timezone: tz, language });
 
   if (loading) return <div className="text-center py-8 text-muted-foreground">{t("loading")}...</div>;
 

@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, Users, Music, Swords, DollarSign } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
 
 const COLORS = ["#9b87f5", "#F97316", "#10B981", "#EAB308", "#EC4899"];
 
@@ -17,6 +19,8 @@ interface StatsData {
 
 const AdminStats = () => {
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [stats, setStats] = useState<StatsData>({
     usersPerDay: [],
     duelsPerWeek: [],
@@ -37,11 +41,10 @@ const AdminStats = () => {
         .select("created_at")
         .gte("created_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-      const locale = language === "fr" ? "fr-FR" : "en-US";
       const usersPerDay = [];
       for (let i = 6; i >= 0; i--) {
         const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-        const dateStr = date.toLocaleDateString(locale, { weekday: "short" });
+        const dateStr = formatTz(date, "EEE", { timezone: tz, language });
         const count = profiles?.filter(p => {
           const d = new Date(p.created_at);
           return d.toDateString() === date.toDateString();

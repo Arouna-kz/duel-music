@@ -13,6 +13,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { GiftAnimationWithSound } from "@/components/animations/GiftAnimationWithSound";
 import { StandardGiftNotification } from "@/components/animations/StandardGiftNotification";
+import { purchaseErrorKey, purchaseErrorTitleKey } from "@/lib/purchaseErrors";
 
 interface ConcertGiftPanelProps {
   concertId: string;
@@ -143,17 +144,18 @@ const ConcertGiftPanel = ({
       return;
     }
 
-    const { error } = await supabase.from("gift_transactions").insert({
-      from_user_id: user.id,
-      to_user_id: artistId,
-      gift_id: selectedGift,
-      live_id: concertId,
-    } as any);
+    const { data: sendResult, error } = await supabase.rpc("send_gift_with_distribution", {
+      p_user_id: user.id,
+      p_gift_id: selectedGift,
+      p_to_user_id: artistId,
+      p_concert_id: concertId,
+    });
 
-    if (error) {
+    const r = sendResult as { success?: boolean; error?: string } | null;
+    if (error || !r?.success) {
       toast({
-        title: t("errorTitle"),
-        description: t("cannotSendGift"),
+        title: t(purchaseErrorTitleKey(r?.error)),
+        description: t(purchaseErrorKey(r?.error)),
         variant: "destructive",
       });
     } else {
@@ -186,6 +188,13 @@ const ConcertGiftPanel = ({
           animChannelRef.current.send({ type: "broadcast", event: "gift_animation", payload: animPayload });
         }
       }
+
+      // Optimistic local decrement to avoid full page reload
+      setGifts((prev) =>
+        prev
+          .map((g: any) => (g.id === selectedGift ? { ...g, quantity: Math.max(0, (g.quantity || 0) - 1) } : g))
+          .filter((g: any) => (g.quantity || 0) > 0)
+      );
 
       setSelectedGift("");
     }

@@ -2,13 +2,17 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Lock, Clock, Eye, Calendar } from "lucide-react";
+import { Play, Lock, Calendar } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { fr, enUS } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
 import { toast } from "sonner";
+import { purchaseErrorKey } from "@/lib/purchaseErrors";
+import { PriceBadge } from "@/components/profile/PriceBadge";
+import { useCurrencyFormatter } from "@/hooks/useCurrency";
+import { useNavigate } from "react-router-dom";
 
 interface ConcertReplayCardProps {
   concert: {
@@ -28,8 +32,11 @@ interface ConcertReplayCardProps {
 
 export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) => {
   const { t, language } = useLanguage();
-  const dateLocale = language === "fr" ? fr : enUS;
+  const { prefs } = useUiPreferences();
+  const { formatPrice } = useCurrencyFormatter();
+  const tz = prefs.timezone;
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const navigate = useNavigate();
 
   const { data: hasAccess, refetch: refetchAccess } = useQuery({
     queryKey: ["concert-replay-access", concert.id],
@@ -64,10 +71,28 @@ export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) =
     }
     setIsUnlocking(true);
     try {
-      const { error } = await (supabase
-        .from("concert_replay_access" as any)
-        .insert({ concert_id: concert.id, user_id: user.id, price_paid: concert.ticket_price }) as any);
+      const { data: replay } = await supabase
+        .from("replay_videos")
+        .select("id, created_at")
+        .eq("concert_id", concert.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!replay?.id) {
+        toast.error(t("unlockReplayError"));
+        return;
+      }
+      const { data, error } = await supabase.rpc("purchase_replay_access_from_wallet", {
+        p_user_id: user.id,
+        p_replay_id: replay.id,
+      });
       if (error) throw error;
+      const r = data as { success?: boolean; error?: string };
+      if (!r?.success) {
+        if (r?.error === "already_purchased") toast.success(t("replayUnlockedOk"));
+        else toast.error(t(purchaseErrorKey(r?.error)));
+        return;
+      }
       toast.success(t("replayUnlockedOk"));
       refetchAccess();
     } catch (error: any) {
@@ -77,11 +102,25 @@ export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) =
     }
   };
 
-  const handleClick = () => {
-    if (canWatch && concert.recording_url) {
-      onPlay(concert, true);
-    } else if (!canWatch) {
+  const handleClick = async () => {
+    if (!concert.recording_url) return;
+    if (!canWatch) {
       handleUnlock();
+      return;
+    }
+    // Navigate to the unified replay detail page (same layout as duel replays)
+    const { data: replay } = await supabase
+      .from("replay_videos")
+      .select("id, created_at")
+      .eq("concert_id", concert.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (replay?.id) {
+      navigate(`/replay/${replay.id}`);
+    } else {
+      // Fallback to in-place player if no replay row was created
+      onPlay(concert, true);
     }
   };
 
@@ -113,13 +152,9 @@ export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) =
               {t("replayAvailable")}
             </Badge>
           )}
-          
-          {isPremium && (
-            <Badge className="absolute top-2 left-2 bg-accent text-accent-foreground">
-              {concert.ticket_price} FCFA
-            </Badge>
-          )}
-          
+
+          <PriceBadge credits={Number(concert.ticket_price ?? 0)} variant="overlay" className="absolute top-2 left-2" />
+
           {hasAccess && isPremium && (
             <Badge className="absolute bottom-2 left-2 bg-green-500 text-white">
               {t("accessUnlocked")}
@@ -133,7 +168,7 @@ export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) =
         
         <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
           <Calendar className="w-4 h-4" />
-          <span>{format(new Date(concert.scheduled_date), "dd MMMM yyyy", { locale: dateLocale })}</span>
+          <span>{formatTz(concert.scheduled_date, "dd MMMM yyyy", { timezone: tz, language })}</span>
         </div>
         
         <Button 
@@ -144,7 +179,7 @@ export const ConcertReplayCard = ({ concert, onPlay }: ConcertReplayCardProps) =
           {!concert.recording_url ? (
             t("replayNotAvailable")
           ) : isPremium && !canWatch ? (
-            isUnlocking ? t("unlockingReplay") : `${t("unlockReplay")} - ${concert.ticket_price} FCFA`
+            isUnlocking ? t("unlockingReplay") : `${t("unlockReplay")} — ${Number(concert.ticket_price).toLocaleString()} Crédits (≈ ${formatPrice(Number(concert.ticket_price))})`
           ) : (
             <>
               <Play className="w-4 h-4 mr-2" />

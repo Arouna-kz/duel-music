@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Trophy, Plus, Trash2, Award, Crown, Edit } from "lucide-react";
 import SeasonWinnersManager from "./SeasonWinnersManager";
 
@@ -20,6 +22,8 @@ interface VirtualGift { id: string; name: string; price: number; }
 const LeaderboardSeasonsManager = () => {
   const { toast } = useToast();
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [gifts, setGifts] = useState<VirtualGift[]>([]);
@@ -64,7 +68,7 @@ const LeaderboardSeasonsManager = () => {
   const updateReward = async (rewardId: string, updates: Partial<Reward>) => { await supabase.from("leaderboard_rewards").update(updates).eq("id", rewardId); loadData(); };
   const deleteReward = async (rewardId: string) => { await supabase.from("leaderboard_rewards").delete().eq("id", rewardId); loadData(); };
 
-  const fmt = (dt: string) => new Date(dt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "short", year: "numeric" });
+  const fmt = (dt: string) => formatTz(dt, "dd MMM yyyy", { timezone: tz, language });
 
   if (loading) return <div className="text-center py-8 text-muted-foreground">{t("loading")}...</div>;
 
@@ -150,7 +154,7 @@ const LeaderboardSeasonsManager = () => {
                     {reward.reward_type === "virtual_gift" && (
                       <Select value={reward.virtual_gift_id || ""} onValueChange={(v) => updateReward(reward.id, { virtual_gift_id: v })}>
                         <SelectTrigger className="w-[180px]"><SelectValue placeholder={t("adminSeasonsChooseGift")} /></SelectTrigger>
-                        <SelectContent>{gifts.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.price}cr)</SelectItem>)}</SelectContent>
+                        <SelectContent>{gifts.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.price} Crédits)</SelectItem>)}</SelectContent>
                       </Select>
                     )}
                     {reward.reward_type === "physical" && <Input value={reward.physical_description || ""} onChange={(e) => updateReward(reward.id, { physical_description: e.target.value })} className="flex-1" placeholder={t("adminSeasonsLotDesc")} />}

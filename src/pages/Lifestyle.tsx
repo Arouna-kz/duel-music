@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,9 @@ import { useNavigate } from "react-router-dom";
 import { AuthRequiredDialog } from "@/components/auth/AuthRequiredDialog";
 import { ShareButton } from "@/components/sharing/ShareButton";
 import { toast } from "sonner";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { SearchBar } from "@/components/ui/search-bar";
 
 const Lifestyle = () => {
   const { t } = useLanguage();
@@ -21,6 +25,7 @@ const Lifestyle = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [likingVideoId, setLikingVideoId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
@@ -111,10 +116,11 @@ const Lifestyle = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
+      <SEO title="Lifestyle — Vidéos courtes des artistes" description="Découvrez les vidéos lifestyle exclusives de vos artistes préférés sur Duel Music." path="/lifestyle" />
       <Header />
       
-      <main className="container mx-auto px-4 pt-24 pb-16">
+      <main className="flex-1 container mx-auto px-4 pt-24 pb-16 min-h-[80vh]">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-primary bg-clip-text text-transparent">
             {t("lifestylePageTitle")}
@@ -123,6 +129,8 @@ const Lifestyle = () => {
             {t("lifestylePageSubtitle")}
           </p>
         </div>
+
+        <SearchBar value={search} onChange={setSearch} placeholder={`${t("search") || "Rechercher"}...`} />
 
         {isLoading ? (
           <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -143,72 +151,90 @@ const Lifestyle = () => {
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {videos?.map((video) => {
-              const isLiked = likedVideoIds?.includes(video.id);
-              return (
-                <Card key={video.id} className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden">
-                  <div 
-                    className="relative cursor-pointer"
-                    onClick={() => { if (!currentUserId) { setShowAuthDialog(true); return; } navigate(`/video/${video.id}`); }}
-                  >
-                    <div 
-                      className="aspect-[9/16] relative bg-cover bg-center" 
-                      style={{ 
-                        backgroundImage: video.thumbnail_url ? `url(${video.thumbnail_url})` : 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))' 
-                      }}
-                    >
-                      <div className="absolute inset-0 bg-background/40 group-hover:bg-background/20 transition-all flex items-center justify-center">
-                        <Play className="w-12 h-12 text-foreground opacity-90" />
-                      </div>
-                      <Badge className="absolute bottom-2 right-2 bg-background/80 text-foreground">
-                        {video.duration}
-                      </Badge>
-                    </div>
-                  </div>
-                  <CardContent className="p-3">
-                    <h3 className="font-bold text-sm mb-1 text-foreground truncate">{video.title}</h3>
-                    <p className="text-xs text-muted-foreground mb-2">{video.artist_name}</p>
-                    
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
-                      <Eye className="w-3 h-3" />
-                      <span>{formatCount(video.views_count)} {t("viewsCount")}</span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between text-muted-foreground">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={`h-8 px-2 ${isLiked ? "text-red-500" : ""}`}
-                        disabled={likingVideoId === video.id}
-                        onClick={(e) => { e.stopPropagation(); toggleLike(video.id, video.likes_count); }}
-                      >
-                        <Heart className={`w-4 h-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
-                        <span className="text-xs ml-1">{formatCount(video.likes_count)}</span>
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 px-2" onClick={(e) => { e.stopPropagation(); if (!currentUserId) { setShowAuthDialog(true); return; } navigate(`/video/${video.id}`); }}>
-                        <MessageCircle className="w-4 h-4" />
-                        <span className="text-xs ml-1">{video.comments_count}</span>
-                      </Button>
-                      <div onClick={(e) => e.stopPropagation()}>
-                        <ShareButton
-                          contentType="lifestyle"
-                          contentId={video.id}
-                          title={video.title}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
+          <PaginatedVideos
+            videos={(videos || []).filter((v: any) => {
+              const q = search.trim().toLowerCase();
+              if (!q) return true;
+              return v.title?.toLowerCase().includes(q) || v.artist_name?.toLowerCase().includes(q);
             })}
-          </div>
+            currentUserId={currentUserId}
+            setShowAuthDialog={setShowAuthDialog}
+            navigate={navigate}
+            likedVideoIds={likedVideoIds}
+            likingVideoId={likingVideoId}
+            toggleLike={toggleLike}
+            formatCount={formatCount}
+            t={t}
+          />
         )}
       </main>
 
       <AuthRequiredDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
       <Footer />
     </div>
+  );
+};
+
+const PaginatedVideos = ({ videos, currentUserId, setShowAuthDialog, navigate, likedVideoIds, likingVideoId, toggleLike, formatCount, t }: any) => {
+  const { page, setPage, pageCount, paginated } = usePagination(videos, 12);
+  return (
+    <>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {paginated.map((video: any) => {
+          const isLiked = likedVideoIds?.includes(video.id);
+          return (
+            <Card key={video.id} className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden">
+              <div
+                className="relative cursor-pointer"
+                onClick={() => { if (!currentUserId) { setShowAuthDialog(true); return; } navigate(`/video/${video.id}`); }}
+              >
+                <div
+                  className="aspect-[9/16] relative bg-cover bg-center"
+                  style={{
+                    backgroundImage: video.thumbnail_url ? `url(${video.thumbnail_url})` : 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))'
+                  }}
+                >
+                  <div className="absolute inset-0 bg-background/40 group-hover:bg-background/20 transition-all flex items-center justify-center">
+                    <Play className="w-12 h-12 text-foreground opacity-90" />
+                  </div>
+                  <Badge className="absolute bottom-2 right-2 bg-background/80 text-foreground">
+                    {video.duration}
+                  </Badge>
+                </div>
+              </div>
+              <CardContent className="p-3">
+                <h3 className="font-bold text-sm mb-1 text-foreground truncate">{video.title}</h3>
+                <p className="text-xs text-muted-foreground mb-2">{video.artist_name}</p>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
+                  <Eye className="w-3 h-3" />
+                  <span>{formatCount(video.views_count)} {t("viewsCount")}</span>
+                </div>
+                <div className="flex items-center justify-between text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={`h-8 px-2 ${isLiked ? "text-red-500" : ""}`}
+                    disabled={likingVideoId === video.id}
+                    onClick={(e) => { e.stopPropagation(); toggleLike(video.id, video.likes_count); }}
+                  >
+                    <Heart className={`w-4 h-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
+                    <span className="text-xs ml-1">{formatCount(video.likes_count)}</span>
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-2" onClick={(e) => { e.stopPropagation(); if (!currentUserId) { setShowAuthDialog(true); return; } navigate(`/video/${video.id}`); }}>
+                    <MessageCircle className="w-4 h-4" />
+                    <span className="text-xs ml-1">{video.comments_count}</span>
+                  </Button>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ShareButton contentType="lifestyle" contentId={video.id} title={video.title} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+      <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+    </>
   );
 };
 

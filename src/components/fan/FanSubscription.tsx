@@ -69,7 +69,7 @@ export const FanSubscription = ({ userId }: FanSubscriptionProps) => {
                 </div>
                 <CardTitle>{plan.name}</CardTitle>
                 <CardDescription>
-                  <span className="text-3xl font-bold">{plan.price === 0 ? t("profileSubFree") : `${plan.price}€`}</span>
+                  <span className="text-3xl font-bold">{plan.price === 0 ? t("profileSubFree") : `$${plan.price}`}</span>
                   {plan.price > 0 && t("profileSubMonth")}
                 </CardDescription>
               </CardHeader>

@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Swords, Search, Send, Check, X, Clock } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface DuelRequestFormProps { userId: string; }
 
@@ -22,7 +24,10 @@ interface DuelRequest {
 }
 
 export const DuelRequestForm = ({ userId }: DuelRequestFormProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
+  const fmtDt = (d: string) => formatTz(d, "dd MMM yyyy HH:mm", { timezone: tz, language });
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,6 +96,17 @@ export const DuelRequestForm = ({ userId }: DuelRequestFormProps) => {
         proposed_date: proposedDate || null, message: message.trim() || null
       });
       if (error) throw error;
+
+      // Notify the opponent
+      const { data: me } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+      await supabase.from("notifications").insert({
+        user_id: selectedArtist.id,
+        type: "duel_request",
+        title: t("duelReqSent") || "Nouvelle demande de duel",
+        message: `${me?.full_name || "Un artiste"} → ${selectedArtist.full_name}`,
+        data: { requester_id: userId, proposed_date: proposedDate || null },
+      });
+
       toast({ title: t("duelReqSent"), description: `${t("duelReqSent")} → ${selectedArtist.full_name}` });
       setSelectedArtist(null); setProposedDate(""); setMessage(""); setSearchQuery(""); setArtists([]); loadRequests();
     } catch (error: any) {
@@ -104,6 +120,35 @@ export const DuelRequestForm = ({ userId }: DuelRequestFormProps) => {
         status: accept ? "admin_pending" : "rejected", updated_at: new Date().toISOString()
       }).eq("id", requestId);
       if (error) throw error;
+
+      // Notify requester + admins on accept
+      if (accept) {
+        const req = receivedRequests.find((r) => r.id === requestId) as any;
+        const { data: me } = await supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+        const notifs: any[] = [];
+        if (req?.requester_id) {
+          notifs.push({
+            user_id: req.requester_id,
+            type: "duel_request",
+            title: t("duelReqAccepted") || "Demande acceptée",
+            message: `${me?.full_name || "L'opposant"} a accepté votre duel`,
+            data: { request_id: requestId },
+          });
+        }
+        const { data: admins } = await supabase
+          .from("user_roles").select("user_id").eq("role", "admin");
+        for (const a of admins || []) {
+          notifs.push({
+            user_id: a.user_id,
+            type: "duel_request",
+            title: "Duel à valider",
+            message: "Une demande de duel attend votre approbation.",
+            data: { request_id: requestId },
+          });
+        }
+        if (notifs.length) await supabase.from("notifications").insert(notifs);
+      }
+
       toast({
         title: accept ? t("duelReqAccepted") : t("duelReqRefused"),
         description: accept ? t("duelReqAcceptedDesc") : t("duelReqRefusedDesc"),
@@ -189,9 +234,9 @@ export const DuelRequestForm = ({ userId }: DuelRequestFormProps) => {
                   <div>
                     <p className="font-medium">{request.requester?.full_name || "Artiste"}</p>
                     {request.message && <p className="text-sm text-muted-foreground">{request.message}</p>}
-                    <p className="text-xs text-muted-foreground">{new Date(request.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDt(request.created_at)}</p>
                     {request.proposed_date && (
-                      <p className="text-xs text-primary flex items-center gap-1"><Clock className="w-3 h-3" />{t("duelReqPlanned")} {new Date(request.proposed_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                      <p className="text-xs text-primary flex items-center gap-1"><Clock className="w-3 h-3" />{t("duelReqPlanned")} {fmtDt(request.proposed_date)}</p>
                     )}
                   </div>
                 </div>
@@ -219,9 +264,9 @@ export const DuelRequestForm = ({ userId }: DuelRequestFormProps) => {
                   <Avatar><AvatarImage src={request.opponent?.avatar_url || ""} /><AvatarFallback>{request.opponent?.full_name?.charAt(0) || "?"}</AvatarFallback></Avatar>
                   <div>
                     <p className="font-medium">{request.opponent?.full_name || "Artiste"}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(request.created_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                    <p className="text-xs text-muted-foreground">{fmtDt(request.created_at)}</p>
                     {request.proposed_date && (
-                      <p className="text-xs text-primary flex items-center gap-1"><Clock className="w-3 h-3" />{t("duelReqPlanned")} {new Date(request.proposed_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                      <p className="text-xs text-primary flex items-center gap-1"><Clock className="w-3 h-3" />{t("duelReqPlanned")} {fmtDt(request.proposed_date)}</p>
                     )}
                   </div>
                 </div>

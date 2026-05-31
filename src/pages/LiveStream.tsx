@@ -17,8 +17,9 @@ import ConcertGiftPanel from "@/components/concert/ConcertGiftPanel";
 import { QuickTip } from "@/components/duel/QuickTip";
 import { GiftLeaderboard } from "@/components/duel/GiftLeaderboard";
 import { Input } from "@/components/ui/input";
-import { FloatingHearts, useFloatingHearts } from "@/components/animations/FloatingHearts";
+import { FloatingHearts, useBroadcastHearts, formatLikeCount } from "@/components/animations/FloatingHearts";
 import { FloatingEmojis, EmojiReactionBar, useBroadcastEmojis } from "@/components/animations/FloatingEmojis";
+import { TopDonorBubble } from "@/components/animations/TopDonorBubble";
 import { FullscreenButton } from "@/components/streaming/FullscreenButton";
 import { LiveReportButton } from "@/components/streaming/LiveReportButton";
 
@@ -27,10 +28,12 @@ import { WebRTCHost } from "@/components/concert/WebRTCHost";
 import { WebRTCViewer } from "@/components/concert/WebRTCViewer";
 import { MobileStreamOverlay } from "@/components/streaming/MobileStreamOverlay";
 import { GuestVideoBox, useGuestBroadcast } from "@/components/streaming/GuestVideoBox";
+import { GuestThumbnailGrid } from "@/components/streaming/GuestThumbnailGrid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { WebRTCHostControls } from "@/components/concert/WebRTCHost";
 import { motion, AnimatePresence } from "framer-motion";
 import { FollowArtistButton } from "@/components/artist/FollowArtistButton";
+import { DedicationDialog } from "@/components/concert/DedicationDialog";
 
 const LiveStream = () => {
   const { id } = useParams();
@@ -65,7 +68,7 @@ const LiveStream = () => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const likesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
-  const { hearts, addHeart } = useFloatingHearts();
+  const { hearts, broadcastHeart: addHeart } = useBroadcastHearts(id ? `live-hearts-${id}` : null);
   const { emojis: floatingEmojis, broadcastEmoji: addEmoji } = useBroadcastEmojis(id ? `live-emojis-${id}` : null);
 
   // Auto-fullscreen on mobile (only once on mount, don't re-enter)
@@ -140,6 +143,28 @@ const LiveStream = () => {
 
   const isArtist = currentUserId === live?.artist_id;
   const roomId = `live-${id}`;
+
+  // Eject all non-host viewers as soon as the artist ends the live.
+  // status is polled via useQuery (refetchInterval 10s) — react to it here.
+  const ejectedRef = useRef(false);
+  useEffect(() => {
+    if (!live || ejectedRef.current) return;
+    if (live.status !== "ended") return;
+    if (isArtist) return; // The host already navigated themselves
+    ejectedRef.current = true;
+    guestStream?.getTracks().forEach((tr) => tr.stop());
+    setGuestStream(null);
+    setIsGuest(false);
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    toast({
+      title: t("liveEndedByHostTitle"),
+      description: t("liveEndedByHostDesc"),
+    });
+    navigate("/lives");
+  }, [live?.status, isArtist, navigate, t, toast, guestStream, live]);
+
 
   // Auth check
   useEffect(() => {
@@ -217,6 +242,22 @@ const LiveStream = () => {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [id]);
+
+  // Realtime subscription on the live row itself — so viewers learn immediately
+  // when the artist sets status = "ended" (without waiting for the 10s poll).
+  useEffect(() => {
+    if (!id) return;
+    const ch = supabase
+      .channel(`artist-live-status-${id}`)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "artist_lives",
+        filter: `id=eq.${id}`,
+      }, () => { refetch(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id, refetch]);
 
   // Presence for viewer count
   useEffect(() => {
@@ -519,12 +560,9 @@ const LiveStream = () => {
     setLikes(newCount);
     addHeart();
     likesChannelRef.current?.send({ type: "broadcast", event: "like", payload: { count: newCount } });
-    // Persist to DB
+    // Persist to DB via secured RPC
     if (id) {
-      await supabase.from("live_likes" as any).upsert(
-        { live_id: id, likes_count: newCount, updated_at: new Date().toISOString() },
-        { onConflict: "live_id" }
-      );
+      await supabase.rpc("increment_live_likes" as any, { p_live_id: id, p_delta: 1 });
     }
   };
 
@@ -769,11 +807,8 @@ const LiveStream = () => {
     );
   }, [acceptedGuests]);
 
-  const guestThumbnailIndexById = new Map(
-    acceptedGuests
-      .filter((guest) => guest.user_id !== focusedGuestId)
-      .map((guest, index) => [guest.user_id, index] as const)
-  );
+
+
 
   if (isLoading) {
     return (
@@ -905,26 +940,11 @@ const LiveStream = () => {
                   </div>
                 )}
 
-                {/* Guest video boxes - same component instances preserved between small/large */}
-                {acceptedGuests.map((guest) => {
-                  const isFocusedGuest = focusedGuestId === guest.user_id;
-                  const thumbnailIndex = guestThumbnailIndexById.get(guest.user_id) ?? 0;
-
-                  if (!isFocusedGuest && !showGuestThumbnails) return null;
-
-                  return (
-                    <div
-                      key={guest.id}
-                      className={isFocusedGuest ? "absolute inset-0 z-10" : "absolute z-20"}
-                      style={
-                        isFocusedGuest
-                          ? undefined
-                          : {
-                              right: isMobile ? 8 : 16,
-                                bottom: isMobile ? 156 + thumbnailIndex * 92 : 16 + thumbnailIndex * 108,
-                            }
-                      }
-                    >
+                {/* Focused guest renders fullscreen — kept outside the grid */}
+                {acceptedGuests
+                  .filter((g) => g.user_id === focusedGuestId)
+                  .map((guest) => (
+                    <div key={guest.id} className="absolute inset-0 z-10">
                       <GuestVideoBox
                         guestUserId={guest.user_id}
                         guestName={guest.user_name}
@@ -932,15 +952,44 @@ const LiveStream = () => {
                         liveId={id!}
                         currentUserId={currentUserId}
                         localStream={guest.user_id === currentUserId ? guestStream : undefined}
-                        isMainView={isFocusedGuest}
+                        isMainView
                         forceMicOff={!!hostMutedGuests[guest.user_id]}
-                        onToggleExpand={() => setFocusedGuestId(isFocusedGuest ? null : guest.user_id)}
+                        onToggleExpand={() => setFocusedGuestId(null)}
                         timerRemaining={guestTimers[guest.user_id]?.remaining}
                         timerTotal={guestTimers[guest.user_id]?.total}
                       />
                     </div>
-                  );
-                })}
+                  ))}
+
+                {/* Responsive thumbnail grid — auto-adapts columns × rows to container size */}
+                {showGuestThumbnails && (
+                  <GuestThumbnailGrid
+                    containerRef={videoContainerRef as React.RefObject<HTMLElement>}
+                    isMobile={isMobile}
+                    guests={acceptedGuests
+                      .filter((g) => g.user_id !== focusedGuestId)
+                      .map((guest) => ({
+                        key: guest.id,
+                        name: guest.user_name,
+                        node: (
+                          <GuestVideoBox
+                            guestUserId={guest.user_id}
+                            guestName={guest.user_name}
+                            guestAvatarUrl={guest.avatar_url}
+                            liveId={id!}
+                            currentUserId={currentUserId}
+                            localStream={guest.user_id === currentUserId ? guestStream : undefined}
+                            isMainView={false}
+                            forceMicOff={!!hostMutedGuests[guest.user_id]}
+                            onToggleExpand={() => setFocusedGuestId(guest.user_id)}
+                            timerRemaining={guestTimers[guest.user_id]?.remaining}
+                            timerTotal={guestTimers[guest.user_id]?.total}
+                          />
+                        ),
+                      }))}
+                  />
+                )}
+
 
                 {/* Guest controls overlay — hidden on mobile (handled by MobileStreamOverlay icons) */}
                 {isGuest && guestStream && !isMobile && (
@@ -1080,6 +1129,7 @@ const LiveStream = () => {
                 {/* Floating reactions (desktop) */}
                 {!isMobile && <FloatingHearts hearts={hearts} />}
                 {!isMobile && <FloatingEmojis emojis={floatingEmojis} />}
+                {id && <TopDonorBubble contextType="live" contextId={id} />}
 
                 {/* Fullscreen (desktop) */}
                 {!isMobile && (
@@ -1110,7 +1160,7 @@ const LiveStream = () => {
                       })()}
                     </div>
                     <div className="absolute top-4 right-4 bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2 z-10">
-                      <Heart className="w-5 h-5 fill-destructive text-destructive" /> {likes}
+                      <Heart className="w-5 h-5 fill-destructive text-destructive" /> {formatLikeCount(likes)}
                     </div>
                   </>
                 )}
@@ -1236,6 +1286,9 @@ const LiveStream = () => {
               artistName={live.artist_name}
             />
             <QuickTip recipientIds={[{ id: live.artist_id, name: live.artist_name || "Artiste" }]} />
+            {!isArtist && currentUserId && (
+              <DedicationDialog concertId={id!} artistName={live.artist_name || "Artiste"} concertType="artist_live" />
+            )}
             <GiftLeaderboard liveId={id!} />
 
             {/* Chat */}

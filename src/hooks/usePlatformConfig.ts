@@ -17,3 +17,20 @@ export const usePricingEnabled = () => {
     staleTime: 5 * 60 * 1000,
   });
 };
+
+export const useReferralEnabled = () => {
+  return useQuery({
+    queryKey: ["referral-config-enabled"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("platform_settings")
+        .select("value")
+        .eq("key", "referral_config")
+        .maybeSingle();
+      if (!data?.value) return true;
+      const val = data.value as Record<string, unknown>;
+      return (val.enabled as boolean) ?? true;
+    },
+    staleTime: 60 * 1000,
+  });
+};

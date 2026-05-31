@@ -81,7 +81,7 @@ export const VoteAnimation = ({ amount, artistName, color }: VoteAnimationProps)
             className="text-7xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent"
             style={{ textShadow: `0 0 30px ${color}` }}
           >
-            +{amount}€
+            +${amount}
           </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

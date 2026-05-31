@@ -12,6 +12,10 @@ import { Instagram, Twitter, Youtube, Facebook, Music, Calendar, Swords, Users, 
 import { ShareButton } from "@/components/sharing/ShareButton";
 import { motion } from "framer-motion";
 import { ImageZoomDialog } from "@/components/ui/image-zoom-dialog";
+import { PriceBadge } from "@/components/profile/PriceBadge";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
+import SEO from "@/components/seo/SEO";
 interface ArtistProfile {
   id: string;
   user_id: string;
@@ -54,7 +58,10 @@ interface LifestyleVideo {
 
 const ArtistPublicProfile = () => {
   const { id } = useParams();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
+  const fmtDt = (d: string) => formatTz(d, "dd MMM yyyy HH:mm", { timezone: tz, language });
   const [profile, setProfile] = useState<ArtistProfile | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [concerts, setConcerts] = useState<Concert[]>([]);
@@ -250,6 +257,21 @@ const ArtistPublicProfile = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={`${profile.stage_name || "Artiste"} — Duel Music`}
+        description={(profile.bio || `Découvrez ${profile.stage_name} sur Duel Music. Concerts, duels, lifestyle et plus.`).slice(0, 160)}
+        path={`/artist/${profile.user_id}`}
+        image={profile.avatar_url || profile.cover_image_url || undefined}
+        type="profile"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "MusicGroup",
+          name: profile.stage_name,
+          description: profile.bio || undefined,
+          image: profile.avatar_url || undefined,
+          url: `https://rhythm-remix-arena.lovable.app/artist/${profile.user_id}`,
+        }}
+      />
       <Header />
       
       {/* Cover Image */}
@@ -406,9 +428,9 @@ const ArtistPublicProfile = () => {
                     <CardContent className="p-3">
                       <h3 className="font-medium truncate">{concert.title}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {new Date(concert.scheduled_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {fmtDt(concert.scheduled_date)}
                       </p>
-                      <p className="text-sm font-bold text-primary">{concert.ticket_price} €</p>
+                      <div className="mt-1"><PriceBadge credits={Number(concert.ticket_price) || 0} size="sm" /></div>
                     </CardContent>
                   </Card>
                 </Link>
@@ -439,7 +461,7 @@ const ArtistPublicProfile = () => {
                         </Badge>
                         {duel.scheduled_time && (
                           <p className="text-sm text-muted-foreground mt-1">
-                            {new Date(duel.scheduled_time).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                            {fmtDt(duel.scheduled_time)}
                           </p>
                         )}
                       </div>

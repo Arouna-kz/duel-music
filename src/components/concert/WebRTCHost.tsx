@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -6,6 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Video, VideoOff, Mic, MicOff, Radio, Users, Pause, Play, Wifi, WifiOff, SwitchCamera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { VideoFiltersPicker } from "@/components/streaming/VideoFiltersPicker";
+import { useVideoFilter } from "@/hooks/useVideoFilter";
+import { getFilterCss } from "@/lib/videoFilters";
 
 export interface WebRTCHostControls {
   isStreaming: boolean;
@@ -58,7 +63,9 @@ export const WebRTCHost = ({
 }: WebRTCHostProps) => {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [filterSlot, setFilterSlot] = useState<HTMLElement | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -71,6 +78,7 @@ export const WebRTCHost = ({
     isConnected,
     connectionState,
     peerCount,
+    room,
     startLocalStream,
     joinRoom,
     leaveRoom,
@@ -104,6 +112,25 @@ export const WebRTCHost = ({
       });
     },
   });
+
+  // Video filter (TikTok-style) — applied via canvas processor on published track
+  const { filterId, setFilterId } = useVideoFilter(room, isStreaming && isCameraOn && !isPaused);
+
+  // On mobile, mount the filter trigger inside the MobileStreamOverlay slot (below description icon)
+  useEffect(() => {
+    if (!isMobile || !isStreaming || !isCameraOn || isPaused || hideOverlays) {
+      setFilterSlot(null);
+      return;
+    }
+    let raf = 0;
+    const find = () => {
+      const el = document.getElementById("mobile-video-filter-slot");
+      if (el) setFilterSlot(el);
+      else raf = requestAnimationFrame(find);
+    };
+    find();
+    return () => { cancelAnimationFrame(raf); setFilterSlot(null); };
+  }, [isMobile, isStreaming, isCameraOn, isPaused, hideOverlays]);
 
   // Update video element when local stream changes
   useEffect(() => {
@@ -239,6 +266,7 @@ export const WebRTCHost = ({
         playsInline
         muted
         className="w-full h-full object-cover"
+        style={{ filter: getFilterCss(filterId) }}
       />
 
       {isPaused && (
@@ -279,6 +307,17 @@ export const WebRTCHost = ({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Video filters picker (TikTok-style beauty) — desktop: floating top-left; mobile: portaled into overlay slot below description */}
+      {isStreaming && isCameraOn && !isPaused && !hideOverlays && !isMobile && (
+        <div className="absolute top-16 left-3 z-50 pointer-events-auto">
+          <VideoFiltersPicker filterId={filterId} onChange={setFilterId} compact />
+        </div>
+      )}
+      {isStreaming && isCameraOn && !isPaused && !hideOverlays && isMobile && filterSlot && createPortal(
+        <VideoFiltersPicker filterId={filterId} onChange={setFilterId} compact />,
+        filterSlot
       )}
 
       {/* All overlay badges (LIVE, viewers, connection) are handled by LiveStream.tsx / MobileStreamOverlay — removed here to avoid duplication */}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { supabase } from "@/integrations/supabase/client";
+import { useAudioActivity } from "@/hooks/useAudioActivity";
 import { Maximize, Minimize, Video, VideoOff, Mic, MicOff, Timer } from "lucide-react";
 
 interface GuestVideoBoxProps {
@@ -234,11 +235,18 @@ export const GuestVideoBox = ({
 
   const micIsOn = forceMicOff ? false : hasAudioTrack;
 
+  // Speaking detection — pulse the border when this guest is actually making sound
+  const isSpeaking = useAudioActivity(attachedStream, { enabled: micIsOn && !forceMicOff });
+
   const truncatedName = guestName && guestName.length > 12 ? guestName.slice(0, 12) + "…" : guestName;
+
+  const speakingRing = isSpeaking && !isMainView
+    ? "ring-4 ring-green-400/80 ring-offset-1 ring-offset-background animate-pulse"
+    : "";
 
   return (
     <div
-      className={`${sizeClasses} ${isMainView ? '' : `rounded-lg ${borderColor} border-2 cursor-pointer hover:ring-2 hover:ring-primary`} overflow-hidden bg-black transition-all relative group`}
+      className={`${sizeClasses} ${isMainView ? '' : `rounded-lg ${borderColor} border-2 cursor-pointer hover:ring-2 hover:ring-primary ${speakingRing}`} overflow-hidden bg-black transition-all relative group`}
       onClick={onToggleExpand}
     >
       {/* CRITICAL: Never use display:none (hidden) — it stops audio playback in most browsers.

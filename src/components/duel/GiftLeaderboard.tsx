@@ -34,28 +34,33 @@ export const GiftLeaderboard = ({ duelId, concertId, liveId }: GiftLeaderboardPr
   const fetchLeaderboard = async () => {
     if (!contextId) return;
 
-    let query = supabase
-      .from("gift_transactions")
-      .select("from_user_id, gift_id") as any;
+    // Count one "engagement" per gift sent + per vote cast
+    const counts: Record<string, number> = {};
+
+    let giftQuery = supabase.from("gift_transactions").select("from_user_id") as any;
+    if (duelId) giftQuery = giftQuery.eq("duel_id", duelId);
+    else if (concertId || liveId) giftQuery = giftQuery.eq("live_id", concertId || liveId);
+    const { data: gifts } = await giftQuery;
+    (gifts || []).forEach((g: any) => {
+      counts[g.from_user_id] = (counts[g.from_user_id] || 0) + 1;
+    });
 
     if (duelId) {
-      query = query.eq("duel_id", duelId);
-    } else if (concertId || liveId) {
-      query = query.eq("live_id", concertId || liveId);
+      const { data: votes } = await supabase
+        .from("duel_votes")
+        .select("user_id")
+        .eq("duel_id", duelId);
+      (votes || []).forEach((v: any) => {
+        counts[v.user_id] = (counts[v.user_id] || 0) + 1;
+      });
     }
 
-    const { data: transactions } = await query;
-    if (!transactions || transactions.length === 0) {
+    const userIds = Object.keys(counts);
+    if (userIds.length === 0) {
       setDonors([]);
       return;
     }
 
-    const counts: Record<string, number> = {};
-    transactions.forEach((t: any) => {
-      counts[t.from_user_id] = (counts[t.from_user_id] || 0) + 1;
-    });
-
-    const userIds = Object.keys(counts);
     const { data: profiles } = await supabase.rpc("get_display_profiles", {
       user_ids: userIds,
     });
@@ -87,9 +92,15 @@ export const GiftLeaderboard = ({ duelId, concertId, liveId }: GiftLeaderboardPr
         { event: "INSERT", schema: "public", table: "gift_transactions" },
         () => { fetchLeaderboard(); }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "duel_votes" },
+        () => { fetchLeaderboard(); }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duelId, concertId, liveId]);
 
   if (donors.length === 0) return null;

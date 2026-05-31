@@ -26,6 +26,7 @@ import VideoDetail from "./pages/VideoDetail";
 import Replays from "./pages/Replays";
 import ReplayDetail from "./pages/ReplayDetail";
 import GiftShop from "./pages/GiftShop";
+import Transactions from "./pages/Transactions";
 import TechnicalDoc from "./pages/TechnicalDoc";
 import UserGuide from "./pages/UserGuide";
 import HelpCenter from "./pages/HelpCenter";
@@ -73,6 +74,7 @@ const AnimatedRoutes = () => {
         <Route path="/my-replays" element={<PageTransition><MyReplays /></PageTransition>} />
         <Route path="/replay/:id" element={<PageTransition><ReplayDetail /></PageTransition>} />
         <Route path="/gift-shop" element={<PageTransition><GiftShop /></PageTransition>} />
+        <Route path="/transactions" element={<PageTransition><Transactions /></PageTransition>} />
         <Route path="/technical-doc" element={<PageTransition><TechnicalDoc /></PageTransition>} />
         <Route path="/user-guide" element={<PageTransition><UserGuide /></PageTransition>} />
         <Route path="/help" element={<PageTransition><HelpCenter /></PageTransition>} />

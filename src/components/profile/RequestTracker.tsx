@@ -4,6 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, CheckCircle, XCircle, FileText, Briefcase, DollarSign } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
+import { useCurrencyFormatter } from "@/hooks/useCurrency";
 
 interface Request {
   id: string;
@@ -16,6 +19,9 @@ interface Request {
 
 export const RequestTracker = ({ userId }: { userId: string }) => {
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const { formatCreditsLabel, formatPrice } = useCurrencyFormatter();
+  const tz = prefs.timezone;
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,7 +39,7 @@ export const RequestTracker = ({ userId }: { userId: string }) => {
   };
 
   const fmt = (dt: string) =>
-    new Date(dt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", { day: "2-digit", month: "long", year: "numeric" });
+    formatTz(dt, "dd MMMM yyyy", { timezone: tz, language });
 
   useEffect(() => {
     if (!userId) return;
@@ -51,7 +57,7 @@ export const RequestTracker = ({ userId }: { userId: string }) => {
       const all: Request[] = [
         ...(artistRes.data || []).map(r => ({ id: r.id, type: "artist" as const, label: t("profileRequestArtistLabel"), status: r.status, created_at: r.created_at })),
         ...(managerRes.data || []).map(r => ({ id: r.id, type: "manager" as const, label: t("profileRequestManagerLabel"), status: r.status, created_at: r.created_at })),
-        ...(withdrawalRes.data || []).map(r => ({ id: r.id, type: "withdrawal" as const, label: `${t("profileRequestWithdrawalLabel")} ${r.amount} €`, status: r.status, created_at: r.created_at, extra: `${r.amount} €` })),
+        ...(withdrawalRes.data || []).map(r => ({ id: r.id, type: "withdrawal" as const, label: `${t("profileRequestWithdrawalLabel")} ${formatCreditsLabel(Number(r.amount))} (≈ ${formatPrice(Number(r.amount))})`, status: r.status, created_at: r.created_at, extra: formatPrice(Number(r.amount)) })),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       setRequests(all);

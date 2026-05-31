@@ -95,9 +95,11 @@ const VotePanel = ({ duelId, artist1Id, artist2Id }: VotePanelProps) => {
     });
 
     if (error || !success) {
+      const { purchaseErrorKey, purchaseErrorTitleKey } = await import("@/lib/purchaseErrors");
+      const code = error ? null : "insufficient_balance";
       toast({
-        title: t("errorTitle"),
-        description: error ? t("cannotRecordVote") : t("insufficientBalanceShort"),
+        title: t(purchaseErrorTitleKey(code)),
+        description: error ? t("cannotRecordVote") : t(purchaseErrorKey(code)),
         variant: "destructive",
       });
     } else {
@@ -113,7 +115,7 @@ const VotePanel = ({ duelId, artist1Id, artist2Id }: VotePanelProps) => {
 
       toast({
         title: t("voteRecorded"),
-        description: `${t("youVoted")} ${voteAmount}€`,
+        description: `${t("youVoted")} $${voteAmount}`,
       });
       setAmount("1");
     }
@@ -198,7 +200,7 @@ const VotePanel = ({ duelId, artist1Id, artist2Id }: VotePanelProps) => {
                       size="sm"
                       onClick={() => setAmount(val)}
                     >
-                      {val}€
+                      ${val}
                     </Button>
                   ))}
                 </div>

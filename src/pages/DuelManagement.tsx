@@ -12,10 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Video, Upload, Search } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 const DuelManagement = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [loading, setLoading] = useState(true);
   const [canManage, setCanManage] = useState(false);
   const [artists, setArtists] = useState<any[]>([]);
@@ -417,7 +423,7 @@ const DuelManagement = () => {
                           {duel.artist1_name} vs {duel.artist2_name}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(duel.ended_at).toLocaleDateString("fr-FR")}
+                          {formatTz(duel.ended_at, "d MMM yyyy", { timezone: tz, language })}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">

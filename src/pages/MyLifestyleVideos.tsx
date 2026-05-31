@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 import { Play, Heart, MessageCircle, Eye, ArrowLeft, Trash2, Edit } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +27,9 @@ interface LifestyleVideo {
 }
 
 const MyLifestyleVideos = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const navigate = useNavigate();
   const { toast } = useToast();
   const [videos, setVideos] = useState<LifestyleVideo[]>([]);
@@ -162,7 +166,7 @@ const MyLifestyleVideos = () => {
                 <CardContent className="p-3">
                   <h3 className="font-bold text-sm mb-1 text-foreground truncate">{video.title}</h3>
                   <p className="text-xs text-muted-foreground mb-2">
-                    {new Date(video.created_at).toLocaleDateString()}
+                    {formatTz(video.created_at, "d MMM yyyy", { timezone: tz, language })}
                   </p>
                   
                   <div className="flex items-center justify-between text-muted-foreground mb-3">

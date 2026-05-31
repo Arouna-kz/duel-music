@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { SearchBar } from "@/components/ui/search-bar";
 
 const Lives = () => {
   const { t } = useLanguage();
@@ -33,6 +37,7 @@ const Lives = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -80,7 +85,11 @@ const Lives = () => {
     refetchInterval: 10000,
   });
 
-  const activeLives = lives?.filter(l => l.status === "live") || [];
+  const activeLives = (lives?.filter(l => l.status === "live") || []).filter((l: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return l.artist_name?.toLowerCase().includes(q) || l.title?.toLowerCase().includes(q);
+  });
 
   // Presence-based viewer counts for active lives
   useEffect(() => {
@@ -138,6 +147,7 @@ const Lives = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Lives spontanés — Duel Music" description="Rejoignez les lives spontanés des artistes en ce moment. Chat, cadeaux et soutien direct." path="/lives" />
       <Header />
 
       <main className="container mx-auto px-4 pt-24 pb-16">
@@ -181,6 +191,8 @@ const Lives = () => {
           )}
         </div>
 
+        <SearchBar value={search} onChange={setSearch} placeholder={`${t("search") || "Rechercher"}...`} />
+
         {isLoading ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map(i => (
@@ -196,38 +208,14 @@ const Lives = () => {
         ) : (
           <>
             {activeLives.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {activeLives.map(live => (
-                  <Card
-                    key={live.id}
-                    className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden cursor-pointer ring-2 ring-red-500/50"
-                    onClick={() => {
-                      if (!currentUserId) { setShowAuthDialog(true); return; }
-                      navigate(`/live/${live.id}`);
-                    }}
-                  >
-                    <div className="relative h-48 bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
-                      <Avatar className="w-20 h-20 border-4 border-primary">
-                        <AvatarImage src={live.artist_avatar} />
-                        <AvatarFallback className="text-2xl">{live.artist_name?.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="absolute top-3 left-3">
-                        <Badge className="bg-red-500 text-white animate-pulse">🔴 LIVE</Badge>
-                      </div>
-                      <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 text-white text-xs rounded-full px-2 py-1">
-                        <Users className="w-3 h-3" /> {viewerCounts[live.id] || 0} {t("viewers")}
-                      </div>
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-bold text-lg text-foreground">{live.artist_name}</h3>
-                      <p className="text-sm text-muted-foreground">{live.title || t("liveInProgress")}</p>
-                      <Button className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white">
-                        <Eye className="w-4 h-4 mr-2" /> {t("watchLive")}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <PaginatedLives
+                lives={activeLives}
+                viewerCounts={viewerCounts}
+                navigate={navigate}
+                currentUserId={currentUserId}
+                setShowAuthDialog={setShowAuthDialog}
+                t={t}
+              />
             ) : (
               <div className="text-center py-16">
                 <Radio className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -243,6 +231,47 @@ const Lives = () => {
       <AuthRequiredDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
       <Footer />
     </div>
+  );
+};
+
+const PaginatedLives = ({ lives, viewerCounts, navigate, currentUserId, setShowAuthDialog, t }: any) => {
+  const { page, setPage, pageCount, paginated } = usePagination(lives, 9);
+  return (
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {paginated.map((live: any) => (
+          <Card
+            key={live.id}
+            className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden cursor-pointer ring-2 ring-red-500/50"
+            onClick={() => {
+              if (!currentUserId) { setShowAuthDialog(true); return; }
+              navigate(`/live/${live.id}`);
+            }}
+          >
+            <div className="relative h-48 bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center">
+              <Avatar className="w-20 h-20 border-4 border-primary">
+                <AvatarImage src={live.artist_avatar} />
+                <AvatarFallback className="text-2xl">{live.artist_name?.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <div className="absolute top-3 left-3">
+                <Badge className="bg-red-500 text-white animate-pulse">🔴 LIVE</Badge>
+              </div>
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-black/50 text-white text-xs rounded-full px-2 py-1">
+                <Users className="w-3 h-3" /> {viewerCounts[live.id] || 0} {t("viewers")}
+              </div>
+            </div>
+            <CardContent className="p-4">
+              <h3 className="font-bold text-lg text-foreground">{live.artist_name}</h3>
+              <p className="text-sm text-muted-foreground">{live.title || t("liveInProgress")}</p>
+              <Button className="w-full mt-3 bg-red-500 hover:bg-red-600 text-white">
+                <Eye className="w-4 h-4 mr-2" /> {t("watchLive")}
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+    </>
   );
 };
 

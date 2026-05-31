@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Heart, Send, Gift, Trophy, Users, X, Reply, Smile, Settings, UserPlus, Mic, MicOff, Video, VideoOff, LogOut, Pause, Play, Eye, EyeOff, Hand, Clock, FileText, Disc, Swords, MessageCircle, SwitchCamera } from "lucide-react";
+import { Heart, Send, Gift, Trophy, Users, X, Reply, Smile, Settings, UserPlus, Mic, MicOff, Video, VideoOff, LogOut, Pause, Play, Eye, EyeOff, Hand, Clock, FileText, Disc, Swords, MessageCircle, SwitchCamera, Megaphone } from "lucide-react";
 import { FloatingHearts, useFloatingHearts } from "@/components/animations/FloatingHearts";
 import { FloatingEmojis, EmojiReactionBar, useFloatingEmojis, type FloatingEmoji } from "@/components/animations/FloatingEmojis";
 
@@ -98,6 +98,8 @@ interface MobileStreamOverlayProps {
   recordingContent?: React.ReactNode;
   timerContent?: React.ReactNode;
   voteBarContent?: React.ReactNode;
+  /** Sponsor ad trigger UI (shown inline left of the Like button). */
+  sponsorAdContent?: React.ReactNode;
 }
 
 export const MobileStreamOverlay = ({
@@ -142,6 +144,7 @@ export const MobileStreamOverlay = ({
   recordingContent,
   timerContent,
   voteBarContent,
+  sponsorAdContent,
 }: MobileStreamOverlayProps) => {
   const isMobile = useIsMobile();
   const [newMessage, setNewMessage] = useState("");
@@ -158,6 +161,7 @@ export const MobileStreamOverlay = ({
   const [showExtraControls, setShowExtraControls] = useState(false);
   const [showVotePanel, setShowVotePanel] = useState(false);
   const [showRecordingPanel, setShowRecordingPanel] = useState(false);
+  const [showSponsorAdPanel, setShowSponsorAdPanel] = useState(false);
   const [hideOverlay, setHideOverlay] = useState(defaultHidden ?? false);
   const [showCommentPopup, setShowCommentPopup] = useState(false);
   const { emojis: localEmojis, addEmoji: addLocalEmoji } = useFloatingEmojis();
@@ -202,10 +206,11 @@ export const MobileStreamOverlay = ({
     setShowExtraControls(false);
     setShowVotePanel(false);
     setShowRecordingPanel(false);
+    setShowSponsorAdPanel(false);
   };
 
   const togglePanel = (
-    panel: "gift" | "leaderboard" | "artist" | "guest" | "join" | "description" | "manager" | "extra" | "vote" | "recording"
+    panel: "gift" | "leaderboard" | "artist" | "guest" | "join" | "description" | "manager" | "extra" | "vote" | "recording" | "sponsorAd"
   ) => {
     const isOpen = {
       gift: showGiftPanel,
@@ -218,6 +223,7 @@ export const MobileStreamOverlay = ({
       extra: showExtraControls,
       vote: showVotePanel,
       recording: showRecordingPanel,
+      sponsorAd: showSponsorAdPanel,
     }[panel];
 
     closeAllPanels();
@@ -233,6 +239,7 @@ export const MobileStreamOverlay = ({
     if (panel === "extra") setShowExtraControls(true);
     if (panel === "vote") setShowVotePanel(true);
     if (panel === "recording") setShowRecordingPanel(true);
+    if (panel === "sponsorAd") setShowSponsorAdPanel(true);
   };
 
   useEffect(() => {
@@ -451,6 +458,9 @@ export const MobileStreamOverlay = ({
           </button>
         )}
 
+        {/* Slot for the video filters trigger (rendered via portal from WebRTCHost / WebRTCDuelStream on mobile) */}
+        <div id="mobile-video-filter-slot" className="contents" />
+
         {/* Toggle thumbnails — just below description */}
         {hasGuests && (
           <button
@@ -459,6 +469,17 @@ export const MobileStreamOverlay = ({
             title={showGuestThumbnails ? "Masquer vignettes" : "Afficher vignettes"}
           >
             {showGuestThumbnails ? <EyeOff className="w-5 h-5 text-foreground" /> : <Eye className="w-5 h-5 text-foreground" />}
+          </button>
+        )}
+
+        {/* Sponsor ad management — manager (duels) / artist (concerts) */}
+        {sponsorAdContent && (
+          <button
+            onClick={() => togglePanel("sponsorAd")}
+            className="w-10 h-10 rounded-full bg-amber-500/60 backdrop-blur-sm flex items-center justify-center border border-amber-400/40"
+            title="Gérer la publicité"
+          >
+            <Megaphone className="w-5 h-5 text-white" />
           </button>
         )}
 
@@ -795,6 +816,31 @@ export const MobileStreamOverlay = ({
             </div>
             <div className="px-4 pb-4 overflow-y-auto max-h-[50vh]">
               {guestManagementContent}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sponsor Ad Panel */}
+      <AnimatePresence>
+        {showSponsorAdPanel && sponsorAdContent && (
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="absolute bottom-0 left-0 right-0 z-[100] bg-background rounded-t-2xl border-t border-border shadow-2xl pointer-events-auto"
+          >
+            <div className="flex items-center justify-between px-4 pt-4 pb-2">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Megaphone className="w-5 h-5 text-amber-500" /> Gestion des publicités
+              </h3>
+              <button onClick={() => setShowSponsorAdPanel(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-4 pb-6 overflow-y-auto max-h-[45vh]">
+              {sponsorAdContent}
             </div>
           </motion.div>
         )}

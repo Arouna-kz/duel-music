@@ -9,12 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { ArrowLeft, Calendar, MapPin, Ticket, Users, CheckCircle, UserPlus, UserCheck } from "lucide-react";
-import { format } from "date-fns";
-import { fr, enUS } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { ConcertReminder } from "@/components/concert/ConcertReminder";
 import { FollowArtistButton } from "@/components/artist/FollowArtistButton";
+import { PriceBadge } from "@/components/profile/PriceBadge";
+import { useCurrencyFormatter } from "@/hooks/useCurrency";
+import { DedicationDialog } from "@/components/concert/DedicationDialog";
+import SEO from "@/components/seo/SEO";
 
 const ConcertDetail = () => {
   const { id } = useParams();
@@ -23,7 +27,8 @@ const ConcertDetail = () => {
   const queryClient = useQueryClient();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
-  const dateLocale = language === "fr" ? fr : enUS;
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => { setCurrentUserId(user?.id || null); });
@@ -43,6 +48,8 @@ const ConcertDetail = () => {
           scheduled_time: new Date(artistConcert.scheduled_date).toLocaleTimeString(language === "fr" ? 'fr-FR' : 'en-US', { hour: '2-digit', minute: '2-digit' }),
           location: t("online"), ticket_price: artistConcert.ticket_price, max_tickets: artistConcert.max_tickets,
           stream_url: artistConcert.stream_url, status: artistConcert.status, image_url: artistConcert.cover_image_url, is_artist_concert: true,
+          allows_dedications: (artistConcert as any).allows_dedications ?? true,
+          allows_sponsor_ads: (artistConcert as any).allows_sponsor_ads ?? true,
         };
       }
       const { data, error } = await supabase.from("concerts").select("*").eq("id", id).maybeSingle();
@@ -79,16 +86,17 @@ const ConcertDetail = () => {
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error(t("loginToBuy"));
-      const { data: existing } = await supabase.from("concert_tickets").select("id").eq("concert_id", id).eq("user_id", user.id).maybeSingle();
-      if (existing) throw new Error(t("alreadyHaveTicket"));
-      const ticketCode = `TICKET-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      if (concert && concert.ticket_price > 0) {
-        const { data, error } = await supabase.functions.invoke("create-ticket-checkout", { body: { concertId: id } });
-        if (error) throw new Error(error.message);
-        if (data?.url) { window.location.href = data.url; return; }
+      // Use wallet RPC: deducts credits, creates ticket and distributes revenue atomically
+      const { data, error } = await supabase.rpc("purchase_concert_ticket_from_wallet", {
+        p_user_id: user.id,
+        p_concert_id: id!,
+      });
+      if (error) throw new Error(error.message);
+      const result = data as { success?: boolean; error?: string };
+      if (!result?.success) {
+        const { purchaseErrorKey } = await import("@/lib/purchaseErrors");
+        throw new Error(t(purchaseErrorKey(result?.error)));
       }
-      const { error } = await supabase.from("concert_tickets").insert({ concert_id: id, user_id: user.id, price_paid: 0, ticket_code: ticketCode });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["concert-tickets", id] });
@@ -123,9 +131,26 @@ const ConcertDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO
+        title={`${concert.title || "Concert"} — Duel Music`}
+        description={(concert.description || `Concert en direct sur Duel Music`).slice(0, 160)}
+        path={`/concert/${concert.id}`}
+        image={concert.image_url || undefined}
+        type="video.other"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "MusicEvent",
+          name: concert.title,
+          description: concert.description || undefined,
+          image: concert.image_url || undefined,
+          startDate: (concert as any).scheduled_date || undefined,
+          eventStatus: concert.status === "live" ? "https://schema.org/EventScheduled" : undefined,
+          location: { "@type": "VirtualLocation", url: `https://rhythm-remix-arena.lovable.app/concert/${concert.id}/live` },
+        }}
+      />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
-        <Button variant="ghost" onClick={() => navigate("/lives")} className="mb-8">
+        <Button variant="ghost" onClick={() => navigate("/concerts")} className="mb-8">
           <ArrowLeft className="w-4 h-4 mr-2" />{t("back")}
         </Button>
 
@@ -158,9 +183,9 @@ const ConcertDetail = () => {
 
             <Card className="bg-card/50 border-border">
               <CardContent className="p-6 space-y-4">
-                <div className="flex items-center gap-3"><Calendar className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("dateTime")}</p><p className="font-semibold">{format(new Date(concert.scheduled_date), "dd MMMM yyyy", { locale: dateLocale })} • {concert.scheduled_time}</p></div></div>
+                <div className="flex items-center gap-3"><Calendar className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("dateTime")}</p><p className="font-semibold">{formatTz(concert.scheduled_date, "dd MMMM yyyy", { timezone: tz, language })} • {concert.scheduled_time}</p></div></div>
                 <div className="flex items-center gap-3"><MapPin className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("venue")}</p><p className="font-semibold">{concert.location}</p></div></div>
-                <div className="flex items-center gap-3"><Ticket className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("ticketPrice")}</p><p className="font-semibold text-xl">{concert.ticket_price} FCFA</p></div></div>
+                <div className="flex items-center gap-3"><Ticket className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("ticketPrice")}</p><div className="mt-1"><PriceBadge credits={Number(concert.ticket_price) || 0} /></div></div></div>
                 {availableTickets !== null && (
                   <div className="flex items-center gap-3"><Users className="w-5 h-5 text-primary" /><div><p className="text-sm text-muted-foreground">{t("availableSeats")}</p><p className="font-semibold">{availableTickets} / {concert.max_tickets}</p></div></div>
                 )}
@@ -185,12 +210,16 @@ const ConcertDetail = () => {
                   </div>
                 ) : (
                   <Button size="lg" className="w-full bg-gradient-primary hover:shadow-glow transition-all text-lg" onClick={() => purchaseTicket.mutate()} disabled={purchaseTicket.isPending || availableTickets === 0 || !currentUserId}>
-                    {!currentUserId ? t("loginToBook") : purchaseTicket.isPending ? t("processing") : availableTickets === 0 ? t("soldOut") : isFree ? t("bookFree") : `${t("buyTicketPrice")} (${concert.ticket_price} FCFA)`}
+                    {!currentUserId ? t("loginToBook") : purchaseTicket.isPending ? t("processing") : availableTickets === 0 ? t("soldOut") : isFree ? t("bookFree") : `${t("buyTicketPrice")} (${Number(concert.ticket_price).toLocaleString()} Crédits)`}
                   </Button>
                 )}
               </>
             ) : (
               <Button size="lg" className="w-full" disabled>{t("concertEnded")}</Button>
+            )}
+
+            {(concert as any).is_artist_concert && (concert as any).allows_dedications && !isOrganizer && currentUserId && concert.status !== "ended" && (
+              <DedicationDialog concertId={concert.id} artistName={concert.artist_name} />
             )}
           </div>
         </div>

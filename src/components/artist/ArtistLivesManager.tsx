@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Radio, Plus, Eye, Users, Calendar, Clock } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface ArtistLivesManagerProps {
   userId: string;
@@ -19,7 +21,9 @@ interface ArtistLivesManagerProps {
 }
 
 export const ArtistLivesManager = ({ userId, onNavigate }: ArtistLivesManagerProps) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [liveTitle, setLiveTitle] = useState("");
@@ -162,61 +166,6 @@ export const ArtistLivesManager = ({ userId, onNavigate }: ArtistLivesManagerPro
           </CardContent>
         </Card>
       )}
-
-      <div>
-        <h4 className="font-semibold mb-3 flex items-center gap-2">
-          <Calendar className="w-4 h-4" />
-          {t("artLivesPast")} ({pastLives.length})
-        </h4>
-
-        {isLoading ? (
-          <div className="text-center py-6 text-muted-foreground">{t("commonLoading")}</div>
-        ) : pastLives.length > 0 ? (
-          <div className="space-y-3">
-            {pastLives.map(live => (
-              <Card key={live.id} className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500/20 to-pink-500/20 flex items-center justify-center">
-                        <Radio className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{live.title || "Live"}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {new Date(live.started_at).toLocaleDateString("fr-FR", {
-                              day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit"
-                            })}
-                          </span>
-                          {live.ended_at && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              {formatDuration(live.started_at, live.ended_at)}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3 h-3" />
-                            {live.viewer_count || 0} {t("artLivesMaxViews")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant="secondary">{t("artLivesEndedBadge")}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 text-center text-muted-foreground text-sm">
-              {t("artLivesNoPast")}
-            </CardContent>
-          </Card>
-        )}
-      </div>
     </div>
   );
 };

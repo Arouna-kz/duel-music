@@ -64,6 +64,28 @@ serve(async (req) => {
       case "checkout.session.completed": {
         const session = event.data.object;
         logStep("Checkout completed", { session_id: session.id, mode: session.mode });
+
+        // Wallet recharge (one-time payment)
+        if (session.mode === "payment" && session.metadata?.type === "wallet") {
+          const userId = session.metadata?.user_id as string | undefined;
+          const eurAmount = Number(session.amount_total ?? 0) / 100;
+          if (userId && eurAmount > 0) {
+            const { computeCreditsForRecharge } = await import("../_shared/recharge-credits.ts");
+            const { credits } = await computeCreditsForRecharge(supabaseClient as any, eurAmount, "EUR", "stripe");
+            if (credits > 0) {
+              const { data: w } = await supabaseClient.from("user_wallets").select("balance").eq("user_id", userId).maybeSingle();
+              const newBal = Number(w?.balance ?? 0) + credits;
+              await supabaseClient.from("user_wallets").upsert({ user_id: userId, balance: newBal, updated_at: new Date().toISOString() });
+              await supabaseClient.from("credit_purchases").insert({
+                user_id: userId, credits_amount: credits, paid_amount: eurAmount,
+                currency: "EUR", payment_method: "stripe", status: "completed", payment_reference: session.id,
+              });
+              logStep("Stripe wallet credited", { user_id: userId, credits });
+            }
+          }
+          break;
+        }
+
         
         if (session.mode === "subscription") {
           const customerEmail = session.customer_email || session.customer_details?.email;

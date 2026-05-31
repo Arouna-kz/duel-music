@@ -11,6 +11,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { purchaseErrorKey, purchaseErrorTitleKey } from "@/lib/purchaseErrors";
 interface GiftPanelProps {
   duelId: string;
   roomId: string;
@@ -102,17 +103,18 @@ const GiftPanel = ({
         return;
       }
 
-      const { error } = await supabase.from("gift_transactions").insert({
-        duel_id: duelId,
-        from_user_id: user.id,
-        to_user_id: recipient,
-        gift_id: selectedGift,
+      const { data: sendResult, error } = await supabase.rpc("send_gift_with_distribution", {
+        p_user_id: user.id,
+        p_gift_id: selectedGift,
+        p_to_user_id: recipient,
+        p_duel_id: duelId,
       });
 
-      if (error) {
+      const r = sendResult as { success?: boolean; error?: string } | null;
+      if (error || !r?.success) {
         toast({
-          title: t("errorTitle"),
-          description: t("cannotSendGift"),
+          title: t(purchaseErrorTitleKey(r?.error)),
+          description: t(purchaseErrorKey(r?.error)),
           variant: "destructive",
         });
         return;
@@ -160,6 +162,13 @@ const GiftPanel = ({
       }
 
       await onGiftAnimationBroadcast(payload);
+
+      // Optimistic local decrement so the UI reflects new quantity without reload
+      setGifts((prev) =>
+        prev
+          .map((g: any) => (g.id === selectedGift ? { ...g, quantity: Math.max(0, (g.quantity || 0) - 1) } : g))
+          .filter((g: any) => (g.quantity || 0) > 0)
+      );
 
       setRecentGifts((prev) => [{ gift_id: selectedGift, to_user_id: recipient }, ...prev.slice(0, 9)]);
 

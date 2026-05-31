@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Play, Pause, Volume2, VolumeX, Maximize, X, SkipBack, SkipForward } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface ConcertReplayPlayerProps {
   concert: {
@@ -20,6 +21,9 @@ interface ConcertReplayPlayerProps {
 }
 
 export const ConcertReplayPlayer = ({ concert, open, onClose }: ConcertReplayPlayerProps) => {
+  const { prefs } = useUiPreferences();
+  const { language } = useLanguage();
+  const tz = prefs.timezone;
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
@@ -152,7 +156,7 @@ export const ConcertReplayPlayer = ({ concert, open, onClose }: ConcertReplayPla
               <DialogTitle className="text-white text-lg">{concert.title}</DialogTitle>
               <p className="text-white/70 text-sm">{concert.artist_name}</p>
               <p className="text-white/50 text-xs">
-                {format(new Date(concert.scheduled_date), "dd MMMM yyyy", { locale: fr })}
+                {formatTz(concert.scheduled_date, "dd MMMM yyyy", { timezone: tz, language })}
               </p>
             </div>
             <Button 

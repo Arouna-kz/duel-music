@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import { Download, Smartphone, CheckCircle, Share, Plus, Wifi, Zap, Bell, Chrome, Globe, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
@@ -93,6 +94,7 @@ const Install = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Installer l'application — Duel Music" description="Installez Duel Music sur votre téléphone et accédez aux duels en un clic." path="/install" />
       <Header />
       <main className="container mx-auto px-4 py-20 max-w-2xl">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: "easeOut" }} className="text-center mb-12">

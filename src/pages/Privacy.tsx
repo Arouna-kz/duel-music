@@ -1,4 +1,5 @@
 import Header from "@/components/Header";
+import SEO from "@/components/seo/SEO";
 import Footer from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +10,7 @@ const Privacy = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Politique de confidentialité — Duel Music" description="Comment Duel Music protège vos données personnelles." path="/privacy" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">

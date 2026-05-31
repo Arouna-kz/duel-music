@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SEO from "@/components/seo/SEO";
 import { useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -10,6 +11,11 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Flame, Users, Trophy, Calendar, Play, Eye, Clock, Video } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthRequiredDialog } from "@/components/auth/AuthRequiredDialog";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { SearchBar } from "@/components/ui/search-bar";
 
 interface DuelVotes {
   [duelId: string]: { artist1: number; artist2: number };
@@ -17,6 +23,8 @@ interface DuelVotes {
 
 const Duels = () => {
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const navigate = useNavigate();
   const [duels, setDuels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +35,7 @@ const Duels = () => {
   const [authChecked, setAuthChecked] = useState(false);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [duelReplays, setDuelReplays] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
 
   const fetchVotes = async (duelIds: string[], duelsData: any[]) => {
     if (duelIds.length === 0) return;
@@ -99,14 +108,42 @@ const Duels = () => {
         }
       }
       
-      // Fetch public duel replays
+      // Fetch public duel replays + enrich with both artists info
       const { data: replayData } = await supabase
         .from("replay_videos")
         .select("*")
         .eq("source_type", "duel")
         .eq("is_public", true)
         .order("recorded_date", { ascending: false });
-      setDuelReplays(replayData || []);
+
+      if (replayData && replayData.length > 0) {
+        const duelIds = replayData.map(r => r.duel_id).filter(Boolean) as string[];
+        let duelMap = new Map<string, any>();
+        if (duelIds.length > 0) {
+          const { data: dRows } = await supabase
+            .from("duels")
+            .select("id, artist1_id, artist2_id, winner_id")
+            .in("id", duelIds);
+          const allArtistIds = [...new Set((dRows || []).flatMap(d => [d.artist1_id, d.artist2_id]))];
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, full_name, avatar_url")
+            .in("id", allArtistIds);
+          const pMap = new Map((profs || []).map(p => [p.id, p]));
+          duelMap = new Map((dRows || []).map(d => [d.id, {
+            ...d,
+            artist1: pMap.get(d.artist1_id) || null,
+            artist2: pMap.get(d.artist2_id) || null,
+          }]));
+        }
+        const enriched = replayData.map(r => ({
+          ...r,
+          duel: r.duel_id ? duelMap.get(r.duel_id) : null,
+        }));
+        setDuelReplays(enriched);
+      } else {
+        setDuelReplays([]);
+      }
 
       setLoading(false);
     };
@@ -158,9 +195,19 @@ const Duels = () => {
     };
   }, [duels]);
 
-  const liveDuels = duels.filter(d => d.status === "live");
-  const upcomingDuels = duels.filter(d => d.status === "upcoming");
-  const endedDuels = duels.filter(d => d.status === "ended");
+  const matchesDuelSearch = (d: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return d.artist1?.full_name?.toLowerCase().includes(q) || d.artist2?.full_name?.toLowerCase().includes(q);
+  };
+  const liveDuels = duels.filter(d => d.status === "live").filter(matchesDuelSearch);
+  const upcomingDuels = duels.filter(d => d.status === "upcoming").filter(matchesDuelSearch);
+  const endedDuels = duels.filter(d => d.status === "ended").filter(matchesDuelSearch);
+  const filteredDuelReplays = duelReplays.filter((r: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return r.title?.toLowerCase().includes(q) || r.duel?.artist1?.full_name?.toLowerCase().includes(q) || r.duel?.artist2?.full_name?.toLowerCase().includes(q);
+  });
 
   const dateLocaleStr = language === "fr" ? "fr-FR" : "en-US";
 
@@ -189,14 +236,23 @@ const Duels = () => {
           )}
 
           {duel.scheduled_time && (
-            <div className="flex items-center gap-1 mb-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 mb-2 text-sm text-muted-foreground">
               <Calendar className="w-3.5 h-3.5" />
-              {new Date(duel.scheduled_time).toLocaleDateString(dateLocaleStr, {
-                day: "2-digit", month: "2-digit", year: "numeric",
-                hour: "2-digit", minute: "2-digit",
-              })}
+              {formatTz(duel.scheduled_time, "dd MMM yyyy HH:mm", { timezone: tz, language })}
             </div>
           )}
+
+          <div className="mb-4">
+            {Number(duel.ticket_price) > 0 ? (
+              <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/40 border">
+                {t("duelPaid")} • {Number(duel.ticket_price).toLocaleString()} {t("creditUnit")}
+              </Badge>
+            ) : (
+              <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/40 border">
+                {t("duelFree")}
+              </Badge>
+            )}
+          </div>
 
           <div className="flex items-center justify-between mb-6">
             <div className="text-center flex-1">
@@ -263,8 +319,9 @@ const Duels = () => {
     );
   };
 
-  const renderDuelList = (duelsList: any[], emptyMessage: string) => {
-    if (duelsList.length === 0) {
+  const PaginatedDuelList = ({ list, emptyMessage }: { list: any[]; emptyMessage: string }) => {
+    const { page, setPage, pageCount, paginated } = usePagination(list, 9);
+    if (list.length === 0) {
       return (
         <div className="text-center py-12">
           <p className="text-muted-foreground">{emptyMessage}</p>
@@ -272,14 +329,18 @@ const Duels = () => {
       );
     }
     return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {duelsList.map(renderDuelCard)}
-      </div>
+      <>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {paginated.map(renderDuelCard)}
+        </div>
+        <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+      </>
     );
   };
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Duels en direct — Duel Music" description="Découvrez tous les duels musicaux en cours et à venir. Votez en direct pour votre artiste favori et faites-le gagner." path="/duels" />
       <Header />
       
       <main className="container mx-auto px-4 pt-24 pb-16">
@@ -290,9 +351,11 @@ const Duels = () => {
           <p className="text-xl text-muted-foreground">
             {t("duelsPageSubtitle")}
           </p>
-        </div>
+          </div>
 
-        {loading ? (
+          <SearchBar value={search} onChange={setSearch} placeholder={`${t("search") || "Rechercher"}...`} />
+
+          {loading ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-muted-foreground">{t("loadingDuels")}</p>
@@ -310,61 +373,26 @@ const Duels = () => {
               </TabsTrigger>
               <TabsTrigger value="replays" className="flex items-center gap-2">
                 <Video className="w-4 h-4" />
-                {t("tabReplays")} ({duelReplays.length})
+                {t("tabReplays")} ({filteredDuelReplays.length})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="live">
-              {renderDuelList(liveDuels, t("noDuelsLive"))}
+              <PaginatedDuelList list={liveDuels} emptyMessage={t("noDuelsLive")} />
             </TabsContent>
             <TabsContent value="upcoming">
-              {renderDuelList(upcomingDuels, t("noDuelsUpcoming"))}
+              <PaginatedDuelList list={upcomingDuels} emptyMessage={t("noDuelsUpcoming")} />
             </TabsContent>
             <TabsContent value="replays">
-              {duelReplays.length === 0 ? (
-                <div className="text-center py-12">
-                  <Video className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">{t("noDuelReplays")}</p>
-                </div>
-              ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {duelReplays.map((replay) => (
-                    <Card
-                      key={replay.id}
-                      className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden cursor-pointer"
-                      onClick={() => {
-                        if (!currentUserId) { setShowAuthDialog(true); return; }
-                        navigate(`/replay/${replay.id}`);
-                      }}
-                    >
-                      <div
-                        className="h-48 bg-cover bg-center relative"
-                        style={{
-                          backgroundImage: replay.thumbnail_url ? `url(${replay.thumbnail_url})` : 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary) / 0.7))'
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-background/40 group-hover:bg-background/20 transition-all flex items-center justify-center">
-                          <Play className="w-12 h-12 text-foreground opacity-90" />
-                        </div>
-                        <Badge className="absolute bottom-2 right-2 bg-background/80 text-foreground">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {replay.duration}
-                        </Badge>
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-bold text-lg mb-2 text-foreground">{replay.title}</h3>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            <span>{replay.views_count || 0} {t("views")}</span>
-                          </div>
-                          <span>{new Date(replay.recorded_date).toLocaleDateString()}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+              <PaginatedDuelReplays
+                replays={filteredDuelReplays}
+                navigate={navigate}
+                currentUserId={currentUserId}
+                setShowAuthDialog={setShowAuthDialog}
+                tz={tz}
+                language={language}
+                t={t}
+              />
             </TabsContent>
           </Tabs>
         )}
@@ -373,6 +401,102 @@ const Duels = () => {
       <AuthRequiredDialog open={showAuthDialog} onOpenChange={setShowAuthDialog} />
       <Footer />
     </div>
+  );
+};
+
+const PaginatedDuelReplays = ({ replays, navigate, currentUserId, setShowAuthDialog, tz, language, t }: any) => {
+  const { page, setPage, pageCount, paginated } = usePagination(replays, 9);
+  if (replays.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Video className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">{t("noDuelReplays")}</p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {paginated.map((replay: any) => (
+          <Card
+            key={replay.id}
+            className="group hover:shadow-glow transition-all bg-card border-border overflow-hidden cursor-pointer"
+            onClick={() => {
+              if (!currentUserId) { setShowAuthDialog(true); return; }
+              navigate(`/replay/${replay.id}`);
+            }}
+          >
+            <div className="relative h-48 overflow-hidden bg-gradient-to-br from-primary/20 via-background to-accent/20">
+              {replay.duel?.artist1 || replay.duel?.artist2 ? (
+                <div className="absolute inset-0 flex">
+                  <div className="flex-1 relative overflow-hidden">
+                    {replay.duel?.artist1?.avatar_url ? (
+                      <img
+                        src={replay.duel.artist1.avatar_url}
+                        alt={replay.duel.artist1.full_name}
+                        className="w-full h-full object-cover"
+                        style={{ clipPath: "polygon(0 0, 100% 0, 85% 100%, 0 100%)" }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-primary" style={{ clipPath: "polygon(0 0, 100% 0, 85% 100%, 0 100%)" }} />
+                    )}
+                  </div>
+                  <div className="flex-1 relative overflow-hidden -ml-6">
+                    {replay.duel?.artist2?.avatar_url ? (
+                      <img
+                        src={replay.duel.artist2.avatar_url}
+                        alt={replay.duel.artist2.full_name}
+                        className="w-full h-full object-cover"
+                        style={{ clipPath: "polygon(15% 0, 100% 0, 100% 100%, 0 100%)" }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-electric" style={{ clipPath: "polygon(15% 0, 100% 0, 100% 100%, 0 100%)" }} />
+                    )}
+                  </div>
+                </div>
+              ) : replay.thumbnail_url ? (
+                <img src={replay.thumbnail_url} alt={replay.title} className="w-full h-full object-cover" />
+              ) : null}
+
+              <div className="absolute inset-0 bg-background/30 group-hover:bg-background/10 transition-all flex items-center justify-center">
+                <div className="rounded-full bg-background/70 backdrop-blur-sm p-4 group-hover:scale-110 transition-transform">
+                  <Play className="w-8 h-8 text-foreground" fill="currentColor" />
+                </div>
+              </div>
+
+              <Badge className="absolute top-2 left-2 bg-destructive text-destructive-foreground shadow-lg">
+                <Trophy className="w-3 h-3 mr-1" />
+                VS
+              </Badge>
+
+              <Badge className="absolute bottom-2 right-2 bg-background/80 text-foreground">
+                <Clock className="w-3 h-3 mr-1" />
+                {replay.duration}
+              </Badge>
+
+              {replay.duel?.artist1 && replay.duel?.artist2 && (
+                <div className="absolute bottom-2 left-2 right-16 flex items-center gap-1 text-xs text-foreground font-semibold drop-shadow-lg truncate">
+                  <span className="truncate max-w-[40%]">{replay.duel.artist1.full_name}</span>
+                  <span className="text-accent">⚔</span>
+                  <span className="truncate max-w-[40%]">{replay.duel.artist2.full_name}</span>
+                </div>
+              )}
+            </div>
+            <CardContent className="p-4">
+              <h3 className="font-bold text-lg mb-2 text-foreground line-clamp-1">{replay.title}</h3>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Eye className="w-4 h-4" />
+                  <span>{replay.views_count || 0} {t("views")}</span>
+                </div>
+                <span>{formatTz(replay.recorded_date, "d MMM yyyy", { timezone: tz, language })}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+    </>
   );
 };
 

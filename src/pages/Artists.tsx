@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import Header from "@/components/Header";
@@ -11,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Users, Music, Mic } from "lucide-react";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 interface Artist {
   id: string;
@@ -84,6 +87,7 @@ const Artists = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SEO title="Artistes — Duel Music" description="Explorez tous les artistes de Duel Music. Suivez vos préférés et soutenez leur carrière." path="/artists" />
       <Header />
       <main className="flex-1 pt-24 pb-12">
         <div className="container mx-auto px-4">
@@ -128,54 +132,59 @@ const Artists = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredArtists.map((artist, index) => (
-                <motion.div
-                  key={artist.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Link to={`/artist/${artist.user_id}`}>
-                    <Card className="overflow-hidden hover:border-primary transition-all hover:shadow-lg group cursor-pointer">
-                      <div className="aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 relative">
-                        <Avatar className="w-full h-full rounded-none">
-                          <AvatarImage 
-                            src={artist.avatar_url || ""} 
-                            className="object-cover"
-                          />
-                          <AvatarFallback className="w-full h-full rounded-none text-6xl">
-                            {(artist.stage_name || artist.full_name || "A")[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-bold text-lg truncate">
-                          {artist.stage_name || artist.full_name || t("artistDefault")}
-                        </h3>
-                        {artist.bio && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                            {artist.bio}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 mt-3">
-                          <Badge variant="secondary" className="text-xs">
-                            <Users className="w-3 h-3 mr-1" />
-                            {artist.followers_count} {t("followers")}
-                          </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
+            <PaginatedArtists artists={filteredArtists} t={t} />
           )}
         </div>
       </main>
       <Footer />
     </div>
+  );
+};
+
+const PaginatedArtists = ({ artists, t }: { artists: Artist[]; t: any }) => {
+  const { page, setPage, pageCount, paginated } = usePagination(artists, 12);
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {paginated.map((artist, index) => (
+          <motion.div
+            key={artist.id}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+          >
+            <Link to={`/artist/${artist.user_id}`}>
+              <Card className="overflow-hidden hover:border-primary transition-all hover:shadow-lg group cursor-pointer">
+                <div className="aspect-square bg-gradient-to-br from-purple-500/20 to-pink-500/20 relative">
+                  <Avatar className="w-full h-full rounded-none">
+                    <AvatarImage src={artist.avatar_url || ""} className="object-cover" />
+                    <AvatarFallback className="w-full h-full rounded-none text-6xl">
+                      {(artist.stage_name || artist.full_name || "A")[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <CardContent className="p-4">
+                  <h3 className="font-bold text-lg truncate">
+                    {artist.stage_name || artist.full_name || t("artistDefault")}
+                  </h3>
+                  {artist.bio && (
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{artist.bio}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-3">
+                    <Badge variant="secondary" className="text-xs">
+                      <Users className="w-3 h-3 mr-1" />
+                      {artist.followers_count} {t("followers")}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+      <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+    </>
   );
 };
 

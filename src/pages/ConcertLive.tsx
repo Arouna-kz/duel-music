@@ -19,8 +19,12 @@ import { ConcertDurationTimer } from "@/components/concert/ConcertDurationTimer"
 import { ConcertRecordingControls } from "@/components/concert/ConcertRecordingControls";
 import { WebRTCHost } from "@/components/concert/WebRTCHost";
 import { WebRTCViewer } from "@/components/concert/WebRTCViewer";
-import { FloatingHearts, useFloatingHearts } from "@/components/animations/FloatingHearts";
+import { FloatingHearts, useBroadcastHearts, formatLikeCount } from "@/components/animations/FloatingHearts";
 import { FloatingEmojis, EmojiReactionBar, useBroadcastEmojis } from "@/components/animations/FloatingEmojis";
+import { TopDonorBubble } from "@/components/animations/TopDonorBubble";
+import { SponsorAdBroadcast } from "@/components/sponsor/SponsorAdBroadcast";
+import { ScheduledAccessGate } from "@/components/scheduling/ScheduledAccessGate";
+import { SponsorAdHistoryPanel } from "@/components/sponsor/SponsorAdHistoryPanel";
 import { FullscreenButton } from "@/components/streaming/FullscreenButton";
 import { SpeakingTimerOverlay } from "@/components/streaming/SpeakingTimerOverlay";
 import { VideoZoomWrapper } from "@/components/streaming/VideoZoomWrapper";
@@ -45,10 +49,25 @@ const ConcertLive = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState<string | null>(null);
   const [mobileChatMessages, setMobileChatMessages] = useState<any[]>([]);
-  const { hearts, addHeart } = useFloatingHearts();
+  const { hearts, broadcastHeart: addHeart } = useBroadcastHearts(id ? `concert-hearts-${id}` : null);
   const { emojis: floatingEmojis, broadcastEmoji: addEmoji } = useBroadcastEmojis(id ? `concert-emojis-${id}` : null);
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const [hostControls, setHostControls] = useState<WebRTCHostControls | null>(null);
+  const [hasTicket, setHasTicket] = useState(false);
+
+  // Check if user already has a ticket for this concert
+  useEffect(() => {
+    if (!id || !currentUserId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("concert_tickets")
+        .select("id")
+        .eq("concert_id", id)
+        .eq("user_id", currentUserId)
+        .maybeSingle();
+      setHasTicket(!!data);
+    })();
+  }, [id, currentUserId]);
 
   // Realtime likes sync via broadcast
   useEffect(() => {
@@ -224,6 +243,24 @@ const ConcertLive = () => {
   // Check if the current user is the concert organizer
   const isOrganizer = currentUserId && concert?.artist_id === currentUserId;
 
+  // Eject all non-organizer viewers when the concert is ended by the host.
+  const ejectedRef = useRef(false);
+  useEffect(() => {
+    if (!concert || ejectedRef.current) return;
+    if (concert.status !== "ended") return;
+    if (isOrganizer) return; // host navigates themselves
+    ejectedRef.current = true;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.().catch(() => {});
+    }
+    toast({
+      title: t("concertEndedByHostTitle"),
+      description: t("concertEndedByHostDesc"),
+    });
+    navigate("/concerts");
+  }, [concert?.status, isOrganizer, navigate, t, toast, concert]);
+
+
   // Room ID for WebRTC
   const roomId = `concert-${id}`;
 
@@ -327,24 +364,9 @@ const ConcertLive = () => {
       payload: { count: newCount },
     });
 
-    // Persist likes count
+    // Persist likes count via secured RPC
     if (id) {
-      const { data: existing } = await supabase
-        .from("live_likes")
-        .select("live_id")
-        .eq("live_id", id)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from("live_likes")
-          .update({ likes_count: newCount })
-          .eq("live_id", id);
-      } else {
-        await supabase
-          .from("live_likes")
-          .insert({ live_id: id, likes_count: newCount });
-      }
+      await supabase.rpc("increment_live_likes" as any, { p_live_id: id, p_delta: 1 });
     }
   };
 
@@ -437,6 +459,17 @@ const ConcertLive = () => {
   if (isMobile) {
     return (
       <div className="fixed inset-0 bg-black z-50">
+        <ScheduledAccessGate
+          type="concert"
+          scheduledAt={concert.scheduled_date}
+          status={concert.status}
+          eventId={concert.id}
+          ticketPrice={Number((concert as any).ticket_price) || 0}
+          isActor={!!isOrganizer || isArtist}
+          hasTicket={hasTicket}
+          isAuthenticated={!!currentUserId}
+          onPurchased={() => setHasTicket(true)}
+        />
         <div className="relative w-full h-full" ref={videoContainerRef}>
           {/* Video stream */}
           {isOrganizer && currentUserId ? (
@@ -520,6 +553,13 @@ const ConcertLive = () => {
               onToggleMic: hostControls.handleToggleMic,
               onSwitchCamera: hostControls.handleSwitchCamera,
             } : undefined}
+            sponsorAdContent={id && concert && ((concert as any).allows_sponsor_ads !== false) ? (
+              <SponsorAdBroadcast
+                eventType={concert.is_artist_concert ? "artist_concert" : "concert"}
+                eventId={id}
+                canTrigger={!!isOrganizer}
+              />
+            ) : undefined}
           />
         </div>
       </div>
@@ -529,6 +569,17 @@ const ConcertLive = () => {
   // ===== DESKTOP LAYOUT =====
   return (
     <div className="min-h-screen bg-background">
+      <ScheduledAccessGate
+        type="concert"
+        scheduledAt={concert.scheduled_date}
+        status={concert.status}
+        eventId={concert.id}
+        ticketPrice={Number((concert as any).ticket_price) || 0}
+        isActor={!!isOrganizer || isArtist}
+        hasTicket={hasTicket}
+        isAuthenticated={!!currentUserId}
+        onPurchased={() => setHasTicket(true)}
+      />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-8">
         <div className="flex items-center justify-between mb-4">
@@ -576,6 +627,8 @@ const ConcertLive = () => {
                 {/* Floating reactions */}
                 <FloatingHearts hearts={hearts} />
                 <FloatingEmojis emojis={floatingEmojis} />
+                {id && <TopDonorBubble contextType="concert" contextId={id} />}
+                {/* Sponsor ad triggers are rendered inline below in the action row to avoid covering other buttons */}
 
                 {/* Top overlay bar: badge, viewer count, timer, likes */}
                 <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
@@ -589,7 +642,7 @@ const ConcertLive = () => {
                   </div>
                   <div className="bg-background/50 backdrop-blur-sm text-foreground px-4 py-2 rounded-full font-bold flex items-center gap-2">
                     <Heart className="w-5 h-5 fill-destructive text-destructive" />
-                    {likes}
+                    {formatLikeCount(likes)}
                   </div>
                 </div>
 
@@ -618,7 +671,7 @@ const ConcertLive = () => {
                 <div className="mb-3">
                   <EmojiReactionBar onReact={addEmoji} />
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {/* Recording controls for organizer */}
                   {isOrganizer && hostStream && (
                     <ConcertRecordingControls
@@ -629,7 +682,16 @@ const ConcertLive = () => {
                       onRecordingSaved={() => refetch()}
                     />
                   )}
-                  
+
+                  {/* Sponsor ad — viewer overlay always mounted; controls only for organizer */}
+                  {id && ((concert as any).allows_sponsor_ads !== false) && (
+                    <SponsorAdBroadcast
+                      eventType={concert.is_artist_concert ? "artist_concert" : "concert"}
+                      eventId={id}
+                      canTrigger={!!isOrganizer}
+                    />
+                  )}
+
                   <Button
                     onClick={sendLike}
                     variant="outline"
@@ -668,8 +730,14 @@ const ConcertLive = () => {
             )}
             {/* Gift Leaderboard */}
             <GiftLeaderboard concertId={id!} />
+            {isOrganizer && id && concert && (
+              <SponsorAdHistoryPanel
+                eventType={concert.is_artist_concert ? "artist_concert" : "concert"}
+                eventId={id}
+              />
+            )}
             <div className="h-[400px] overflow-hidden">
-              <ThreadedChat chatType="concert" entityId={id!} />
+              <ThreadedChat chatType="concert" entityId={id!} hostId={(concert as any)?.artist_id ?? null} />
             </div>
           </div>
         </div>

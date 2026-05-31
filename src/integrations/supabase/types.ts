@@ -115,6 +115,11 @@ export type Database = {
       }
       artist_concerts: {
         Row: {
+          allows_dedications: boolean
+          allows_sponsor_ads: boolean
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
           artist_id: string
           cover_image_url: string | null
           created_at: string
@@ -124,6 +129,7 @@ export type Database = {
           is_replay_available: boolean | null
           max_tickets: number | null
           recording_url: string | null
+          rejection_reason: string | null
           revenue: number | null
           scheduled_date: string
           started_at: string | null
@@ -134,6 +140,11 @@ export type Database = {
           title: string
         }
         Insert: {
+          allows_dedications?: boolean
+          allows_sponsor_ads?: boolean
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           artist_id: string
           cover_image_url?: string | null
           created_at?: string
@@ -143,6 +154,7 @@ export type Database = {
           is_replay_available?: boolean | null
           max_tickets?: number | null
           recording_url?: string | null
+          rejection_reason?: string | null
           revenue?: number | null
           scheduled_date: string
           started_at?: string | null
@@ -153,6 +165,11 @@ export type Database = {
           title: string
         }
         Update: {
+          allows_dedications?: boolean
+          allows_sponsor_ads?: boolean
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           artist_id?: string
           cover_image_url?: string | null
           created_at?: string
@@ -162,6 +179,7 @@ export type Database = {
           is_replay_available?: boolean | null
           max_tickets?: number | null
           recording_url?: string | null
+          rejection_reason?: string | null
           revenue?: number | null
           scheduled_date?: string
           started_at?: string | null
@@ -365,6 +383,158 @@ export type Database = {
         }
         Relationships: []
       }
+      cinetpay_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          created_at: string
+          event: string
+          id: string
+          payload: Json
+          severity: string
+          transaction_id: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          event: string
+          id?: string
+          payload?: Json
+          severity: string
+          transaction_id?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          payload?: Json
+          severity?: string
+          transaction_id?: string | null
+        }
+        Relationships: []
+      }
+      cinetpay_countries: {
+        Row: {
+          country_code: string
+          country_name: string
+          created_at: string
+          currency: string
+          is_active: boolean
+          operators: Json
+          phone_prefix: string
+          secret_key_name: string
+          secret_password_name: string
+          updated_at: string
+        }
+        Insert: {
+          country_code: string
+          country_name: string
+          created_at?: string
+          currency: string
+          is_active?: boolean
+          operators?: Json
+          phone_prefix: string
+          secret_key_name: string
+          secret_password_name: string
+          updated_at?: string
+        }
+        Update: {
+          country_code?: string
+          country_name?: string
+          created_at?: string
+          currency?: string
+          is_active?: boolean
+          operators?: Json
+          phone_prefix?: string
+          secret_key_name?: string
+          secret_password_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cinetpay_transactions: {
+        Row: {
+          amount: number
+          cinetpay_transaction_id: string | null
+          country_code: string
+          created_at: string
+          credits_amount: number | null
+          currency: string
+          error_message: string | null
+          id: string
+          kind: string
+          merchant_transaction_id: string
+          notify_token: string
+          payment_method: string
+          phone_number: string
+          processed_at: string | null
+          raw_init_response: Json | null
+          raw_verify_response: Json | null
+          raw_webhook_payload: Json | null
+          status: string
+          updated_at: string
+          user_id: string
+          withdrawal_request_id: string | null
+        }
+        Insert: {
+          amount: number
+          cinetpay_transaction_id?: string | null
+          country_code: string
+          created_at?: string
+          credits_amount?: number | null
+          currency: string
+          error_message?: string | null
+          id?: string
+          kind: string
+          merchant_transaction_id: string
+          notify_token: string
+          payment_method: string
+          phone_number: string
+          processed_at?: string | null
+          raw_init_response?: Json | null
+          raw_verify_response?: Json | null
+          raw_webhook_payload?: Json | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          withdrawal_request_id?: string | null
+        }
+        Update: {
+          amount?: number
+          cinetpay_transaction_id?: string | null
+          country_code?: string
+          created_at?: string
+          credits_amount?: number | null
+          currency?: string
+          error_message?: string | null
+          id?: string
+          kind?: string
+          merchant_transaction_id?: string
+          notify_token?: string
+          payment_method?: string
+          phone_number?: string
+          processed_at?: string | null
+          raw_init_response?: Json | null
+          raw_verify_response?: Json | null
+          raw_webhook_payload?: Json | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          withdrawal_request_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cinetpay_transactions_country_code_fkey"
+            columns: ["country_code"]
+            isOneToOne: false
+            referencedRelation: "cinetpay_countries"
+            referencedColumns: ["country_code"]
+          },
+        ]
+      }
       comment_likes: {
         Row: {
           comment_id: string
@@ -472,6 +642,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      concert_dedications: {
+        Row: {
+          artist_id: string
+          concert_id: string
+          concert_type: string
+          created_at: string
+          delivered_at: string | null
+          fan_id: string
+          id: string
+          message: string
+          metadata: Json | null
+          paid_at: string
+          price_credits: number
+          rejected_at: string | null
+          status: string
+        }
+        Insert: {
+          artist_id: string
+          concert_id: string
+          concert_type?: string
+          created_at?: string
+          delivered_at?: string | null
+          fan_id: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          paid_at?: string
+          price_credits: number
+          rejected_at?: string | null
+          status?: string
+        }
+        Update: {
+          artist_id?: string
+          concert_id?: string
+          concert_type?: string
+          created_at?: string
+          delivered_at?: string | null
+          fan_id?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          paid_at?: string
+          price_credits?: number
+          rejected_at?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       concert_reminders: {
         Row: {
@@ -626,6 +844,42 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_purchases: {
+        Row: {
+          created_at: string
+          credits_amount: number
+          currency: string
+          id: string
+          paid_amount: number
+          payment_method: string
+          payment_reference: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_amount: number
+          currency?: string
+          id?: string
+          paid_amount: number
+          payment_method?: string
+          payment_reference?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_amount?: number
+          currency?: string
+          id?: string
+          paid_amount?: number
+          payment_method?: string
+          payment_reference?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       duel_ads: {
         Row: {
           content_url: string
@@ -705,6 +959,41 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "duel_chat_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      duel_reminders: {
+        Row: {
+          created_at: string
+          duel_id: string
+          id: string
+          reminder_type: string
+          sent: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duel_id: string
+          id?: string
+          reminder_type: string
+          sent?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duel_id?: string
+          id?: string
+          reminder_type?: string
+          sent?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duel_reminders_duel_id_fkey"
+            columns: ["duel_id"]
+            isOneToOne: false
+            referencedRelation: "duels"
             referencedColumns: ["id"]
           },
         ]
@@ -814,6 +1103,7 @@ export type Database = {
       }
       duels: {
         Row: {
+          allows_sponsor_ads: boolean
           artist1_id: string
           artist2_id: string
           created_at: string | null
@@ -830,6 +1120,7 @@ export type Database = {
           winner_id: string | null
         }
         Insert: {
+          allows_sponsor_ads?: boolean
           artist1_id: string
           artist2_id: string
           created_at?: string | null
@@ -846,6 +1137,7 @@ export type Database = {
           winner_id?: string | null
         }
         Update: {
+          allows_sponsor_ads?: boolean
           artist1_id?: string
           artist2_id?: string
           created_at?: string | null
@@ -905,6 +1197,30 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      exchange_rates: {
+        Row: {
+          currency_code: string
+          name: string | null
+          rate_per_usd: number
+          symbol: string | null
+          updated_at: string
+        }
+        Insert: {
+          currency_code: string
+          name?: string | null
+          rate_per_usd: number
+          symbol?: string | null
+          updated_at?: string
+        }
+        Update: {
+          currency_code?: string
+          name?: string | null
+          rate_per_usd?: number
+          symbol?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1338,6 +1654,96 @@ export type Database = {
         }
         Relationships: []
       }
+      moneroo_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          credits_amount: number | null
+          currency: string
+          debug_logs: Json
+          error_message: string | null
+          http_status: number | null
+          http_status_text: string | null
+          id: string
+          kind: string
+          merchant_transaction_id: string
+          metadata: Json | null
+          moneroo_transaction_id: string | null
+          payment_method: string | null
+          phone_number: string | null
+          processed_at: string | null
+          raw_init_response: Json | null
+          raw_verify_response: Json | null
+          raw_webhook_payload: Json | null
+          request_headers: Json | null
+          request_payload: Json | null
+          request_sent_at: string | null
+          request_url: string | null
+          response_received_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          credits_amount?: number | null
+          currency: string
+          debug_logs?: Json
+          error_message?: string | null
+          http_status?: number | null
+          http_status_text?: string | null
+          id?: string
+          kind: string
+          merchant_transaction_id: string
+          metadata?: Json | null
+          moneroo_transaction_id?: string | null
+          payment_method?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          raw_init_response?: Json | null
+          raw_verify_response?: Json | null
+          raw_webhook_payload?: Json | null
+          request_headers?: Json | null
+          request_payload?: Json | null
+          request_sent_at?: string | null
+          request_url?: string | null
+          response_received_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          credits_amount?: number | null
+          currency?: string
+          debug_logs?: Json
+          error_message?: string | null
+          http_status?: number | null
+          http_status_text?: string | null
+          id?: string
+          kind?: string
+          merchant_transaction_id?: string
+          metadata?: Json | null
+          moneroo_transaction_id?: string | null
+          payment_method?: string | null
+          phone_number?: string | null
+          processed_at?: string | null
+          raw_init_response?: Json | null
+          raw_verify_response?: Json | null
+          raw_webhook_payload?: Json | null
+          request_headers?: Json | null
+          request_payload?: Json | null
+          request_sent_at?: string | null
+          request_url?: string | null
+          response_received_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
@@ -1635,12 +2041,74 @@ export type Database = {
           },
         ]
       }
+      revenue_distributions: {
+        Row: {
+          artist1_credits: number
+          artist1_id: string | null
+          artist2_credits: number
+          artist2_id: string | null
+          created_at: string
+          id: string
+          manager_credits: number
+          manager_id: string | null
+          metadata: Json | null
+          payer_id: string
+          platform_credits: number
+          source_id: string | null
+          source_type: string
+          total_credits: number
+        }
+        Insert: {
+          artist1_credits?: number
+          artist1_id?: string | null
+          artist2_credits?: number
+          artist2_id?: string | null
+          created_at?: string
+          id?: string
+          manager_credits?: number
+          manager_id?: string | null
+          metadata?: Json | null
+          payer_id: string
+          platform_credits?: number
+          source_id?: string | null
+          source_type: string
+          total_credits: number
+        }
+        Update: {
+          artist1_credits?: number
+          artist1_id?: string | null
+          artist2_credits?: number
+          artist2_id?: string | null
+          created_at?: string
+          id?: string
+          manager_credits?: number
+          manager_id?: string | null
+          metadata?: Json | null
+          payer_id?: string
+          platform_credits?: number
+          source_id?: string | null
+          source_type?: string
+          total_credits?: number
+        }
+        Relationships: []
+      }
       season_winners: {
         Row: {
+          counter_location: string | null
+          counter_notes: string | null
+          counter_proposed_at: string | null
+          counter_when: string | null
           created_at: string
           distributed_at: string | null
           id: string
+          meeting_location: string | null
+          meeting_notes: string | null
+          meeting_proposed_at: string | null
+          meeting_proposed_by: string | null
+          meeting_status: string
+          meeting_when: string | null
           notes: string | null
+          notified_winner_at: string | null
           rank_position: number
           received_at: string | null
           reward_status: string
@@ -1648,10 +2116,21 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          counter_location?: string | null
+          counter_notes?: string | null
+          counter_proposed_at?: string | null
+          counter_when?: string | null
           created_at?: string
           distributed_at?: string | null
           id?: string
+          meeting_location?: string | null
+          meeting_notes?: string | null
+          meeting_proposed_at?: string | null
+          meeting_proposed_by?: string | null
+          meeting_status?: string
+          meeting_when?: string | null
           notes?: string | null
+          notified_winner_at?: string | null
           rank_position: number
           received_at?: string | null
           reward_status?: string
@@ -1659,10 +2138,21 @@ export type Database = {
           user_id: string
         }
         Update: {
+          counter_location?: string | null
+          counter_notes?: string | null
+          counter_proposed_at?: string | null
+          counter_when?: string | null
           created_at?: string
           distributed_at?: string | null
           id?: string
+          meeting_location?: string | null
+          meeting_notes?: string | null
+          meeting_proposed_at?: string | null
+          meeting_proposed_by?: string | null
+          meeting_status?: string
+          meeting_when?: string | null
           notes?: string | null
+          notified_winner_at?: string | null
           rank_position?: number
           received_at?: string | null
           reward_status?: string
@@ -1678,6 +2168,222 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sponsor_ad_plays: {
+        Row: {
+          ad_video_id: string
+          duration_seconds: number | null
+          ended_at: string | null
+          event_id: string
+          event_type: string
+          id: string
+          played_at: string
+          request_id: string | null
+          sponsor_paid_credits: number | null
+          triggered_by: string
+        }
+        Insert: {
+          ad_video_id: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          event_id: string
+          event_type: string
+          id?: string
+          played_at?: string
+          request_id?: string | null
+          sponsor_paid_credits?: number | null
+          triggered_by: string
+        }
+        Update: {
+          ad_video_id?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          event_id?: string
+          event_type?: string
+          id?: string
+          played_at?: string
+          request_id?: string | null
+          sponsor_paid_credits?: number | null
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sponsor_ad_plays_ad_video_id_fkey"
+            columns: ["ad_video_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_ad_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sponsor_ad_plays_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "sponsor_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sponsor_ad_videos: {
+        Row: {
+          created_at: string
+          duration_seconds: number | null
+          event_id: string
+          event_type: string
+          id: string
+          is_active: boolean
+          play_count: number
+          source_request_ids: string[] | null
+          title: string
+          uploaded_by: string | null
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          duration_seconds?: number | null
+          event_id: string
+          event_type: string
+          id?: string
+          is_active?: boolean
+          play_count?: number
+          source_request_ids?: string[] | null
+          title: string
+          uploaded_by?: string | null
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          duration_seconds?: number | null
+          event_id?: string
+          event_type?: string
+          id?: string
+          is_active?: boolean
+          play_count?: number
+          source_request_ids?: string[] | null
+          title?: string
+          uploaded_by?: string | null
+          video_url?: string
+        }
+        Relationships: []
+      }
+      sponsor_price_tiers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          max_seconds: number
+          min_seconds: number
+          price_credits: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          max_seconds: number
+          min_seconds: number
+          price_credits: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          max_seconds?: number
+          min_seconds?: number
+          price_credits?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sponsor_requests: {
+        Row: {
+          approved_at: string | null
+          created_at: string
+          description: string
+          event_id: string
+          event_type: string
+          id: string
+          media_duration_seconds: number | null
+          media_type: string
+          media_url: string
+          paid_at: string | null
+          price_credits: number | null
+          rejected_reason: string | null
+          requester_id: string
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          created_at?: string
+          description: string
+          event_id: string
+          event_type: string
+          id?: string
+          media_duration_seconds?: number | null
+          media_type: string
+          media_url: string
+          paid_at?: string | null
+          price_credits?: number | null
+          rejected_reason?: string | null
+          requester_id: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          created_at?: string
+          description?: string
+          event_id?: string
+          event_type?: string
+          id?: string
+          media_duration_seconds?: number | null
+          media_type?: string
+          media_url?: string
+          paid_at?: string | null
+          price_credits?: number | null
+          rejected_reason?: string | null
+          requester_id?: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      stream_bans: {
+        Row: {
+          banned_by: string
+          banned_user_id: string
+          created_at: string
+          id: string
+          reason: string | null
+          stream_id: string
+          stream_type: string
+        }
+        Insert: {
+          banned_by: string
+          banned_user_id: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          stream_id: string
+          stream_type: string
+        }
+        Update: {
+          banned_by?: string
+          banned_user_id?: string
+          created_at?: string
+          id?: string
+          reason?: string | null
+          stream_id?: string
+          stream_type?: string
+        }
+        Relationships: []
       }
       subscription_plans: {
         Row: {
@@ -1760,6 +2466,24 @@ export type Database = {
         }
         Relationships: []
       }
+      user_currency_preferences: {
+        Row: {
+          currency_code: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          currency_code?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          currency_code?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_gifts: {
         Row: {
           gift_id: string | null
@@ -1792,6 +2516,54 @@ export type Database = {
           },
         ]
       }
+      user_payout_methods: {
+        Row: {
+          account_holder: string | null
+          bank_name: string | null
+          created_at: string
+          iban: string | null
+          id: string
+          is_default: boolean
+          label: string | null
+          method: string
+          mobile_operator: string | null
+          paypal_email: string | null
+          phone_number: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_holder?: string | null
+          bank_name?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          method: string
+          mobile_operator?: string | null
+          paypal_email?: string | null
+          phone_number?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_holder?: string | null
+          bank_name?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          is_default?: boolean
+          label?: string | null
+          method?: string
+          mobile_operator?: string | null
+          paypal_email?: string | null
+          phone_number?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -1813,6 +2585,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_ui_preferences: {
+        Row: {
+          created_at: string
+          reduce_animations: boolean
+          timezone: string
+          top_donor_animation: string
+          top_donor_mode: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          reduce_animations?: boolean
+          timezone?: string
+          top_donor_animation?: string
+          top_donor_mode?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          reduce_animations?: boolean
+          timezone?: string
+          top_donor_animation?: string
+          top_donor_mode?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_wallets: {
         Row: {
           balance: number | null
@@ -1827,6 +2629,33 @@ export type Database = {
         Update: {
           balance?: number | null
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_withdrawal_pins: {
+        Row: {
+          created_at: string
+          failed_attempts: number
+          locked_until: string | null
+          pin_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_attempts?: number
+          locked_until?: string | null
+          pin_hash?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
@@ -1920,37 +2749,76 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_pin_reset_tokens: {
+        Row: {
+          attempts: number
+          created_at: string
+          expires_at: string
+          id: string
+          otp_hash: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          expires_at: string
+          id?: string
+          otp_hash: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          otp_hash?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       withdrawal_requests: {
         Row: {
           amount: number
+          auto_processed: boolean
           created_at: string
           id: string
           payment_details: Json | null
           payment_method: string | null
           processed_at: string | null
           processed_by: string | null
+          provider: string | null
+          provider_tx_id: string | null
           status: string
           user_id: string
         }
         Insert: {
           amount: number
+          auto_processed?: boolean
           created_at?: string
           id?: string
           payment_details?: Json | null
           payment_method?: string | null
           processed_at?: string | null
           processed_by?: string | null
+          provider?: string | null
+          provider_tx_id?: string | null
           status?: string
           user_id: string
         }
         Update: {
           amount?: number
+          auto_processed?: boolean
           created_at?: string
           id?: string
           payment_details?: Json | null
           payment_method?: string | null
           processed_at?: string | null
           processed_by?: string | null
+          provider?: string | null
+          provider_tx_id?: string | null
           status?: string
           user_id?: string
         }
@@ -1973,11 +2841,62 @@ export type Database = {
       }
     }
     Functions: {
+      admin_approve_artist_concert: {
+        Args: { p_approve: boolean; p_concert_id: string; p_reason?: string }
+        Returns: Json
+      }
+      admin_approve_sponsor: { Args: { p_request_id: string }; Returns: Json }
+      admin_broadcast_announcement: {
+        Args: { p_message: string; p_target_role?: string; p_title: string }
+        Returns: Json
+      }
+      admin_reject_sponsor: {
+        Args: { p_reason?: string; p_request_id: string }
+        Returns: Json
+      }
+      admin_set_sponsor_price: {
+        Args: { p_price_credits: number; p_request_id: string }
+        Returns: Json
+      }
+      calculate_withdrawal_net: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: Json
+      }
+      can_control_sponsor_ad: {
+        Args: { p_event_id: string; p_event_type: string; p_user: string }
+        Returns: boolean
+      }
+      cinetpay_confirm_payout: {
+        Args: { p_merchant_id: string }
+        Returns: Json
+      }
+      cinetpay_credit_wallet: {
+        Args: { p_credits: number; p_merchant_id: string }
+        Returns: Json
+      }
+      cinetpay_reserve_payout: {
+        Args: { p_credits: number; p_user_id: string }
+        Returns: Json
+      }
+      cinetpay_revert_payout: { Args: { p_merchant_id: string }; Returns: Json }
       claim_referral_reward: {
         Args: { p_referral_id: string; p_user_id: string }
         Returns: boolean
       }
       cleanup_old_signaling: { Args: never; Returns: undefined }
+      compare_distribution_vs_config: {
+        Args: { p_distribution_id: string }
+        Returns: Json
+      }
+      confirm_counter_meeting: { Args: { p_winner_id: string }; Returns: Json }
+      confirm_withdrawal_pin_reset: {
+        Args: { p_new_pin: string; p_otp: string }
+        Returns: Json
+      }
+      count_my_event_transactions: {
+        Args: { p_source_id: string }
+        Returns: number
+      }
       deduct_wallet_and_vote: {
         Args: {
           p_amount: number
@@ -1991,6 +2910,27 @@ export type Database = {
         Args: { _amount: number; _user_id: string }
         Returns: boolean
       }
+      deliver_concert_dedication: {
+        Args: { p_dedication_id: string }
+        Returns: Json
+      }
+      distribute_event_revenue: {
+        Args: {
+          p_artist1_id?: string
+          p_artist2_id?: string
+          p_manager_id?: string
+          p_metadata?: Json
+          p_payer_id: string
+          p_source_id: string
+          p_source_type: string
+          p_total_credits: number
+          p_winner_id?: string
+        }
+        Returns: string
+      }
+      distribute_season_reward: { Args: { p_winner_id: string }; Returns: Json }
+      generate_referral_code: { Args: never; Returns: string }
+      get_credit_purchase_stats: { Args: never; Returns: Json }
       get_display_profiles: {
         Args: { user_ids: string[] }
         Returns: {
@@ -1999,7 +2939,111 @@ export type Database = {
           id: string
         }[]
       }
+      get_my_event_transactions: {
+        Args: { p_limit?: number; p_offset?: number; p_source_id: string }
+        Returns: {
+          artists_credits: number
+          created_at: string
+          id: string
+          manager_credits: number
+          my_credits: number
+          payer_id: string
+          platform_credits: number
+          source_type: string
+          total_credits: number
+        }[]
+      }
+      get_my_revenue_breakdown: {
+        Args: { p_source_id: string }
+        Returns: {
+          last_at: string
+          source_type: string
+          total_received: number
+          tx_count: number
+        }[]
+      }
+      get_my_revenues_by_event: {
+        Args: { p_period?: string }
+        Returns: {
+          event_label: string
+          last_at: string
+          source_id: string
+          source_type: string
+          total_received: number
+          tx_count: number
+        }[]
+      }
       get_platform_stats: { Args: never; Returns: Json }
+      get_revenue_stats: {
+        Args: { p_period?: string }
+        Returns: {
+          artists_credits: number
+          manager_credits: number
+          platform_credits: number
+          source_type: string
+          total_credits: number
+          transaction_count: number
+        }[]
+      }
+      get_season_leaderboard: {
+        Args: { p_limit?: number; p_season_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          gifts_sent: number
+          rank_position: number
+          score: number
+          stage_name: string
+          total_donated: number
+          total_gifts_received: number
+          total_votes: number
+          total_wins: number
+          user_id: string
+          votes_cast: number
+        }[]
+      }
+      get_sponsor_ad_history: {
+        Args: { p_event_id: string; p_event_type: string }
+        Returns: {
+          ad_title: string
+          ad_video_id: string
+          duration_seconds: number
+          ended_at: string
+          play_id: string
+          played_at: string
+          request_id: string
+          sponsor_paid_credits: number
+          triggered_by: string
+          triggered_by_name: string
+        }[]
+      }
+      get_sponsor_default_price: {
+        Args: { p_duration_seconds: number }
+        Returns: number
+      }
+      get_top_donor: {
+        Args: { p_context_id: string; p_context_type: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          last_message: string
+          total_amount: number
+          user_id: string
+        }[]
+      }
+      get_top_earners: {
+        Args: { p_limit?: number; p_period?: string }
+        Returns: {
+          full_name: string
+          role: string
+          total_credits: number
+          user_id: string
+        }[]
+      }
+      get_user_id_by_referral_code: {
+        Args: { p_code: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2007,14 +3051,114 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_withdrawal_pin: { Args: never; Returns: boolean }
+      hash_pin: { Args: { _pin: string; _user_id: string }; Returns: string }
+      increment_live_likes: {
+        Args: { p_delta?: number; p_live_id: string }
+        Returns: number
+      }
       increment_replay_views: {
         Args: { p_replay_id: string }
         Returns: undefined
+      }
+      log_sponsor_ad_play: { Args: { p_ad_video_id: string }; Returns: Json }
+      mark_reward_received: { Args: { p_winner_id: string }; Returns: Json }
+      moneroo_confirm_payout: { Args: { p_merchant_id: string }; Returns: Json }
+      moneroo_credit_wallet: {
+        Args: { p_credits: number; p_merchant_id: string }
+        Returns: Json
+      }
+      moneroo_reserve_payout: {
+        Args: { p_credits: number; p_user_id: string }
+        Returns: Json
+      }
+      moneroo_revert_payout: { Args: { p_merchant_id: string }; Returns: Json }
+      notify_season_winners: { Args: { p_season_id: string }; Returns: Json }
+      pay_sponsor_request: { Args: { p_request_id: string }; Returns: Json }
+      propose_reward_meeting: {
+        Args: {
+          p_location: string
+          p_notes: string
+          p_when: string
+          p_winner_id: string
+        }
+        Returns: Json
+      }
+      purchase_concert_dedication: {
+        Args: {
+          p_concert_id: string
+          p_concert_type: string
+          p_message: string
+          p_price_credits: number
+        }
+        Returns: Json
+      }
+      purchase_concert_ticket_from_wallet: {
+        Args: { p_concert_id: string; p_user_id: string }
+        Returns: Json
+      }
+      purchase_duel_ticket_from_wallet: {
+        Args: { p_duel_id: string; p_user_id: string }
+        Returns: Json
       }
       purchase_gift_from_wallet: {
         Args: { p_gift_id: string; p_quantity: number; p_user_id: string }
         Returns: boolean
       }
+      purchase_replay_access_from_wallet: {
+        Args: { p_replay_id: string; p_user_id: string }
+        Returns: Json
+      }
+      request_withdrawal_pin_reset: { Args: never; Returns: Json }
+      request_withdrawal_with_saved_method:
+        | {
+            Args: { p_amount: number; p_payout_method_id?: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_amount: number
+              p_payout_method_id?: string
+              p_provider?: string
+            }
+            Returns: Json
+          }
+      respond_reward_meeting: {
+        Args: {
+          p_action: string
+          p_location: string
+          p_notes: string
+          p_when: string
+          p_winner_id: string
+        }
+        Returns: Json
+      }
+      send_gift_with_distribution: {
+        Args: {
+          p_concert_id?: string
+          p_duel_id?: string
+          p_gift_id: string
+          p_live_id?: string
+          p_to_user_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      set_user_currency: { Args: { p_currency: string }; Returns: boolean }
+      set_withdrawal_pin: {
+        Args: { p_current_pin?: string; p_new_pin: string }
+        Returns: Json
+      }
+      start_sponsor_ad: {
+        Args: {
+          p_ad_video_id: string
+          p_event_id: string
+          p_event_type: string
+        }
+        Returns: Json
+      }
+      stop_sponsor_ad: { Args: { p_play_id: string }; Returns: Json }
+      verify_withdrawal_pin: { Args: { p_pin: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "moderator" | "artist" | "fan" | "manager"

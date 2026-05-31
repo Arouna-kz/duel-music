@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface AdminLog {
   id: string;
@@ -23,14 +25,13 @@ interface AdminLog {
 
 const AdminLogs = () => {
   const { t, language } = useLanguage();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [logs, setLogs] = useState<AdminLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fmt = (dt: string | null) =>
-    dt ? new Date(dt).toLocaleDateString(language === "fr" ? "fr-FR" : "en-US", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit", second: "2-digit"
-    }) : "—";
+    dt ? formatTz(dt, "dd MMM yyyy HH:mm:ss", { timezone: tz, language }) : "—";
 
   const ACTION_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string }> = {
     approve_artist:   { label: t("adminLogsArtistApproved"),   icon: UserCheck,   color: "bg-green-500/10 text-green-500 border-green-500/30" },
@@ -136,7 +137,7 @@ const AdminLogs = () => {
               if (!d || Object.keys(d).length === 0) return <span className="text-muted-foreground text-xs">—</span>;
               const parts: string[] = [];
               if (d.role) parts.push(`${t("adminLogsDetailRole")}: ${d.role}`);
-              if (d.amount) parts.push(`${t("adminLogsDetailAmount")}: ${d.amount}€`);
+              if (d.amount) parts.push(`${t("adminLogsDetailAmount")}: $${d.amount}`);
               if (d.status) parts.push(`${t("adminLogsDetailStatus")}: ${d.status}`);
               if (d.manager) parts.push(`${t("adminLogsDetailManager")}: ${d.manager}`);
               return <span className="text-xs text-muted-foreground">{parts.join(" · ") || JSON.stringify(d).slice(0, 60)}</span>;

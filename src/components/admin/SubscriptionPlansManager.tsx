@@ -125,7 +125,7 @@ export const SubscriptionPlansManager = () => {
                       {!plan.is_active && <Badge variant="outline">{t("adminSubsInactive")}</Badge>}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {plan.price === 0 ? t("adminSubsFree") : `${plan.price}€${t("adminSubsPerMonth")}`} · {(plan.features as string[])?.length || 0} {t("adminSubsFeatures")}
+                      {plan.price === 0 ? t("adminSubsFree") : `$${plan.price}${t("adminSubsPerMonth")}`} · {(plan.features as string[])?.length || 0} {t("adminSubsFeatures")}
                     </p>
                   </div>
                 </div>

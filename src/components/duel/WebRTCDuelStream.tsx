@@ -1,11 +1,15 @@
-import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
+import { useAudioActivity } from "@/hooks/useAudioActivity";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Video, VideoOff, Mic, MicOff, Radio, Wifi, WifiOff, Pause, Play, SwitchCamera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { VideoFiltersPicker } from "@/components/streaming/VideoFiltersPicker";
+import { useVideoFilter } from "@/hooks/useVideoFilter";
+import { getFilterCss } from "@/lib/videoFilters";
 
 export interface WebRTCDuelStreamHandle {
   startStreaming: () => Promise<void>;
@@ -80,6 +84,7 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
     localStream,
     remoteStreams,
     isConnected,
+    room,
     startLocalStream,
     joinRoom,
     leaveRoom,
@@ -101,6 +106,10 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
       toast({ title: "Erreur de connexion", description: error, variant: "destructive" });
     },
   });
+
+  // Video filter (TikTok-style) — only when current user is publishing
+  const canApplyFilter = isCurrentUser && isParticipant && isStreaming && isCameraOn && !isPaused;
+  const { filterId, setFilterId } = useVideoFilter(room, canApplyFilter);
 
   /** Apply stream to video and audio elements and call play() */
   const applyStreamToElements = useCallback((stream: MediaStream) => {
@@ -435,8 +444,20 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
 
   const hasRemoteStream = !isCurrentUser && Array.from(remoteStreams.values()).length > 0;
 
+  // Speaking detection — pulse the border when this slot is making sound
+  const activeStream = useMemo<MediaStream | null>(() => {
+    if (isCurrentUser) return localStream || null;
+    const remote = Array.from(remoteStreams.values())[0];
+    return remote || null;
+  }, [isCurrentUser, localStream, remoteStreams]);
+  const speakingEnabled = isCurrentUser ? (isMicOn && !isPaused && !isForceMuted) : hasRemoteStream;
+  const isSpeaking = useAudioActivity(activeStream, { enabled: speakingEnabled });
+
   return (
-    <div className="relative w-full h-full overflow-hidden" style={{ background: 'linear-gradient(135deg, hsl(var(--muted)), hsl(var(--accent)/0.15))' }}>
+    <div
+      className={`relative w-full h-full overflow-hidden transition-shadow ${isSpeaking ? 'ring-4 ring-green-400/80 ring-inset animate-pulse' : ''}`}
+      style={{ background: 'linear-gradient(135deg, hsl(var(--muted)), hsl(var(--accent)/0.15))' }}
+    >
       {/* Video: always muted for viewers (audio via separate element) to bypass autoplay restrictions */}
       <video
         ref={videoRef}
@@ -444,6 +465,7 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
         playsInline
         muted
         className="w-full h-full object-cover"
+        style={isCurrentUser ? { filter: getFilterCss(filterId) } : undefined}
       />
       {/* Hidden audio element for remote audio playback (NOT muted) */}
       {!isCurrentUser && <audio ref={audioRef} autoPlay playsInline />}
@@ -520,7 +542,13 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
         </div>
       )}
 
-      {/* Not streaming overlay for participant */}
+      {/* Video filters trigger for the publishing participant */}
+      {canApplyFilter && !hideControls && (
+        <div className="absolute top-2 right-2 z-20">
+          <VideoFiltersPicker filterId={filterId} onChange={setFilterId} compact />
+        </div>
+      )}
+
       {isCurrentUser && !isStreaming && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
           <div className="text-center">

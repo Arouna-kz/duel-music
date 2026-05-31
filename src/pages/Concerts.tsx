@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import SEO from "@/components/seo/SEO";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -10,22 +11,28 @@ import { Calendar, MapPin, Ticket, Radio, Play, Video, Users } from "lucide-reac
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { format } from "date-fns";
-import { fr, enUS } from "date-fns/locale";
+import { formatTz } from "@/lib/datetime";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConcertReplayCard } from "@/components/concert/ConcertReplayCard";
 import { ConcertReplayPlayer } from "@/components/concert/ConcertReplayPlayer";
 import { AuthRequiredDialog } from "@/components/auth/AuthRequiredDialog";
+import { PriceBadge } from "@/components/profile/PriceBadge";
+import { SimplePagination } from "@/components/ui/simple-pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { SearchBar } from "@/components/ui/search-bar";
 
 const Concerts = () => {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
-  const dateLocale = language === "fr" ? fr : enUS;
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
   const [selectedReplay, setSelectedReplay] = useState<any | null>(null);
   const [showPlayer, setShowPlayer] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setCurrentUserId(user?.id || null));
@@ -142,11 +149,20 @@ const Concerts = () => {
     })
     .filter(Boolean) as any[];
 
+  const matchesSearch = (c: any) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (c.title?.toLowerCase().includes(q) || c.artist_name?.toLowerCase().includes(q));
+  };
+  const filteredLive = liveConcerts.filter(matchesSearch);
+  const filteredUpcoming = upcomingConcerts.filter(matchesSearch);
+  const filteredReplays = replayConcerts.filter(matchesSearch);
+
   const getStatusBadge = (concert: any) => {
     if (concert.status === "live") {
       return <Badge className="bg-red-500 text-white animate-pulse"><Radio className="w-3 h-3 mr-1" />{t("live")}</Badge>;
     }
-    return <Badge className="bg-accent text-accent-foreground"><Ticket className="w-3 h-3 mr-1" />{concert.ticket_price} FCFA</Badge>;
+    return <PriceBadge credits={Number(concert.ticket_price) || 0} variant="overlay" />;
   };
 
   const ConcertCard = ({ concert }: { concert: any }) => (
@@ -171,7 +187,7 @@ const Concerts = () => {
         <div className="space-y-2 mb-6">
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="w-4 h-4" />
-            <span className="text-sm">{format(new Date(concert.scheduled_date), "dd MMMM yyyy", { locale: dateLocale })} • {concert.scheduled_time}</span>
+            <span className="text-sm">{formatTz(concert.scheduled_date, "dd MMMM yyyy", { timezone: tz, language })} • {concert.scheduled_time}</span>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <MapPin className="w-4 h-4" />
@@ -197,12 +213,15 @@ const Concerts = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEO title="Concerts en direct — Duel Music" description="Tous les concerts live et programmés sur Duel Music. Achetez votre ticket et vivez la musique en temps réel." path="/concerts" />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-primary bg-clip-text text-transparent">{t("concertsPageTitle")}</h1>
           <p className="text-xl text-muted-foreground">{t("concertsPageSubtitle")}</p>
         </div>
+
+        <SearchBar value={search} onChange={setSearch} placeholder={`${t("search") || "Rechercher"}...`} />
 
         {isLoading ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -211,27 +230,27 @@ const Concerts = () => {
             ))}
           </div>
         ) : (
-          <Tabs defaultValue={liveConcerts.length > 0 ? "live" : "upcoming"} className="w-full">
+          <Tabs defaultValue={filteredLive.length > 0 ? "live" : "upcoming"} className="w-full">
             <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="live" className="relative">
-                {t("tabLive")} ({liveConcerts.length})
-                {liveConcerts.length > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
+                {t("tabLive")} ({filteredLive.length})
+                {filteredLive.length > 0 && <span className="ml-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />}
               </TabsTrigger>
-              <TabsTrigger value="upcoming">{t("tabUpcoming")} ({upcomingConcerts.length})</TabsTrigger>
-              <TabsTrigger value="replays" className="flex items-center gap-1"><Video className="w-4 h-4" />{t("tabReplays")} ({replayConcerts.length})</TabsTrigger>
+              <TabsTrigger value="upcoming">{t("tabUpcoming")} ({filteredUpcoming.length})</TabsTrigger>
+              <TabsTrigger value="replays" className="flex items-center gap-1"><Video className="w-4 h-4" />{t("tabReplays")} ({filteredReplays.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="live">
-              {liveConcerts.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{liveConcerts.map(c => <ConcertCard key={c.id} concert={c} />)}</div>
+              {filteredLive.length > 0 ? (
+                <PaginatedGrid items={filteredLive} render={(c: any) => <ConcertCard key={c.id} concert={c} />} />
               ) : (
                 <div className="text-center py-16"><Radio className="w-16 h-16 mx-auto text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2">{t("noConcertsLive")}</h3></div>
               )}
             </TabsContent>
 
             <TabsContent value="upcoming">
-              {upcomingConcerts.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{upcomingConcerts.map(c => <ConcertCard key={c.id} concert={c} />)}</div>
+              {filteredUpcoming.length > 0 ? (
+                <PaginatedGrid items={filteredUpcoming} render={(c: any) => <ConcertCard key={c.id} concert={c} />} />
               ) : (
                 <div className="text-center py-16"><Calendar className="w-16 h-16 mx-auto text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2">{t("noConcertsUpcoming")}</h3></div>
               )}
@@ -239,10 +258,8 @@ const Concerts = () => {
 
 
             <TabsContent value="replays">
-              {replayConcerts.length > 0 ? (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                  {replayConcerts.map(c => <ConcertReplayCard key={c.id} concert={c} onPlay={handlePlayReplay} />)}
-                </div>
+              {filteredReplays.length > 0 ? (
+                <PaginatedGrid items={filteredReplays} render={(c: any) => <ConcertReplayCard key={c.id} concert={c} onPlay={handlePlayReplay} />} />
               ) : (
                 <div className="text-center py-16"><Video className="w-16 h-16 mx-auto text-muted-foreground mb-4" /><h3 className="text-xl font-semibold mb-2">{t("noConcertReplays")}</h3></div>
               )}
@@ -254,6 +271,16 @@ const Concerts = () => {
       <Footer />
       <ConcertReplayPlayer concert={selectedReplay} open={showPlayer} onClose={() => { setShowPlayer(false); setSelectedReplay(null); }} />
     </div>
+  );
+};
+
+const PaginatedGrid = ({ items, render }: { items: any[]; render: (item: any) => React.ReactNode }) => {
+  const { page, setPage, pageCount, paginated } = usePagination(items, 9);
+  return (
+    <>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{paginated.map(render)}</div>
+      <SimplePagination page={page} pageCount={pageCount} onPageChange={setPage} />
+    </>
   );
 };
 

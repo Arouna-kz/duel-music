@@ -70,7 +70,9 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${req.headers.get("origin")}/profile?payment=success&amount=${amount}&type=${type}`,
+      success_url: type === "wallet"
+        ? `${req.headers.get("origin")}/wallet?recharge=success&provider=stripe&sid={CHECKOUT_SESSION_ID}&amount=${amount}&currency=EUR`
+        : `${req.headers.get("origin")}/profile?payment=success&amount=${amount}&type=${type}`,
       cancel_url: `${req.headers.get("origin")}/wallet?payment=cancelled`,
       metadata: {
         user_id: userId,

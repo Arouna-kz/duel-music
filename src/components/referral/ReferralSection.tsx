@@ -5,8 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Copy, Gift, Users, CheckCircle } from "lucide-react";
+import { Copy, Gift, Users, CheckCircle, Share2, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useReferralEnabled } from "@/hooks/usePlatformConfig";
+import { ReferralShareDialog } from "./ReferralShareDialog";
+import { useUiPreferences } from "@/hooks/useUiPreferences";
+import { formatTz } from "@/lib/datetime";
 
 interface Referral {
   id: string;
@@ -18,11 +22,15 @@ interface Referral {
 }
 
 const ReferralSection = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
+  const { prefs } = useUiPreferences();
+  const tz = prefs.timezone;
+  const { data: referralEnabled = true, isLoading: configLoading } = useReferralEnabled();
   const [referralCode, setReferralCode] = useState<string>("");
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     fetchReferralData();
@@ -32,7 +40,6 @@ const ReferralSection = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get user's referral code
     const { data: profile } = await supabase
       .from("profiles")
       .select("referral_code")
@@ -41,25 +48,15 @@ const ReferralSection = () => {
 
     if (profile?.referral_code) {
       setReferralCode(profile.referral_code);
-    } else {
-      // Generate a referral code if not exists
-      const code = `REF-${user.id.slice(0, 8).toUpperCase()}`;
-      await supabase
-        .from("profiles")
-        .update({ referral_code: code })
-        .eq("id", user.id);
-      setReferralCode(code);
     }
 
-    // Get referrals
     const { data: referralsData } = await supabase
       .from("referrals")
       .select("*")
       .eq("referrer_id", user.id)
       .order("created_at", { ascending: false });
 
-    if (referralsData) {
-      // Get referred users' names
+    if (referralsData && referralsData.length > 0) {
       const referredIds = referralsData.map(r => r.referred_id);
       const { data: profiles } = await supabase
         .from("profiles")
@@ -72,25 +69,40 @@ const ReferralSection = () => {
       }));
 
       setReferrals(enrichedReferrals);
+    } else {
+      setReferrals([]);
     }
 
     setLoading(false);
   };
 
-  const copyReferralLink = () => {
-    const link = `${window.location.origin}/auth?ref=${referralCode}`;
-    navigator.clipboard.writeText(link);
-    toast({
-      title: t("success"),
-      description: "Lien de parrainage copié!",
-    });
+  // When referral system is disabled, share the plain origin (no ref param)
+  // so any previously shared invite link gracefully degrades to a normal link.
+  const referralLink = referralEnabled && referralCode
+    ? `${window.location.origin}/auth?ref=${referralCode}`
+    : `${window.location.origin}/auth`;
+
+  const copyCode = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    toast({ title: t("codeCopied") });
+  };
+
+  const copyLink = () => {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
+    toast({ title: t("linkCopied") });
+  };
+
+  const shareLink = () => {
+    if (!referralLink) return;
+    setShareOpen(true);
   };
 
   const claimReward = async (referralId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Atomic: marks reward claimed AND credits wallet in one DB transaction (prevents replay attacks)
     const { data: success, error } = await supabase.rpc("claim_referral_reward", {
       p_referral_id: referralId,
       p_user_id: user.id,
@@ -113,13 +125,31 @@ const ReferralSection = () => {
     fetchReferralData();
   };
 
-
   const completedReferrals = referrals.filter(r => r.status === "completed");
-  const pendingReferrals = referrals.filter(r => r.status === "pending");
   const unclaimedRewards = completedReferrals.filter(r => !r.reward_claimed);
 
-  if (loading) {
-    return <div className="text-center py-8">Chargement...</div>;
+  if (loading || configLoading) {
+    return <div className="text-center py-8 text-muted-foreground">{t("loading")}...</div>;
+  }
+
+  // System disabled by admin: hide code/link, show notice only
+  if (!referralEnabled) {
+    return (
+      <Card className="bg-gradient-to-br from-muted/40 to-muted/10 border-muted">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-muted-foreground" />
+            {t("referralProgram")}
+          </CardTitle>
+          <CardDescription>{t("referralDisabledNotice")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {t("referralDisabledDetail")}
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -128,41 +158,57 @@ const ReferralSection = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Gift className="w-5 h-5 text-primary" />
-            {t("referralProgram") || "Programme de Parrainage"}
+            {t("referralProgram")}
           </CardTitle>
-          <CardDescription>
-            {t("referralDescription") || "Invitez vos amis et gagnez 50 crédits par parrainage réussi!"}
-          </CardDescription>
+          <CardDescription>{t("referralDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Referral code */}
           <div>
             <label className="text-sm text-muted-foreground mb-2 block">
-              {t("yourReferralLink") || "Votre lien de parrainage"}
+              {t("yourReferralCode")}
             </label>
             <div className="flex gap-2">
               <Input
-                value={`${window.location.origin}/auth?ref=${referralCode}`}
+                value={referralCode}
                 readOnly
-                className="bg-background/50"
+                className="bg-background/50 font-mono font-bold tracking-wider"
               />
-              <Button onClick={copyReferralLink} variant="secondary">
+              <Button onClick={copyCode} variant="secondary" title={t("copyCode")}>
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 pt-4">
+          {/* Referral link */}
+          <div>
+            <label className="text-sm text-muted-foreground mb-2 block">
+              {t("yourReferralLink")}
+            </label>
+            <div className="flex gap-2">
+              <Input value={referralLink} readOnly className="bg-background/50 text-xs" />
+              <Button onClick={copyLink} variant="secondary" title={t("copyLink")}>
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button onClick={shareLink} className="bg-gradient-primary" title={t("shareLink")}>
+                <Share2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-4">
             <div className="text-center p-3 rounded-lg bg-background/50">
               <p className="text-2xl font-bold text-primary">{referrals.length}</p>
-              <p className="text-xs text-muted-foreground">{t("totalInvites") || "Total invités"}</p>
+              <p className="text-xs text-muted-foreground">{t("signupsViaCode")}</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-background/50">
               <p className="text-2xl font-bold text-green-500">{completedReferrals.length}</p>
-              <p className="text-xs text-muted-foreground">{t("confirmed") || "Confirmés"}</p>
+              <p className="text-xs text-muted-foreground">{t("confirmed")}</p>
             </div>
             <div className="text-center p-3 rounded-lg bg-background/50">
               <p className="text-2xl font-bold text-accent">{unclaimedRewards.length * 50}</p>
-              <p className="text-xs text-muted-foreground">{t("creditsToCollect") || "Crédits à récupérer"}</p>
+              <p className="text-xs text-muted-foreground">{t("creditsToCollect")}</p>
             </div>
           </div>
         </CardContent>
@@ -173,7 +219,7 @@ const ReferralSection = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              {t("yourReferrals") || "Vos Filleuls"}
+              {t("yourReferrals")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -190,7 +236,7 @@ const ReferralSection = () => {
                     <div>
                       <p className="font-medium">{referral.referred_name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(referral.created_at).toLocaleDateString()}
+                        {formatTz(referral.created_at, "dd MMM yyyy", { timezone: tz, language })}
                       </p>
                     </div>
                   </div>
@@ -200,7 +246,7 @@ const ReferralSection = () => {
                       referral.reward_claimed ? (
                         <Badge variant="secondary" className="gap-1">
                           <CheckCircle className="w-3 h-3" />
-                          {t("claimed") || "Réclamé"}
+                          {t("claimed")}
                         </Badge>
                       ) : (
                         <Button
@@ -209,12 +255,12 @@ const ReferralSection = () => {
                           className="bg-gradient-primary"
                         >
                           <Gift className="w-3 h-3 mr-1" />
-                          +50 crédits
+                          +50
                         </Button>
                       )
                     ) : (
                       <Badge variant="outline" className="text-yellow-500 border-yellow-500">
-                        {t("pending") || "En attente"}
+                        {t("pending")}
                       </Badge>
                     )}
                   </div>
@@ -224,6 +270,12 @@ const ReferralSection = () => {
           </CardContent>
         </Card>
       )}
+      <ReferralShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        referralLink={referralLink}
+        referralCode={referralCode}
+      />
     </div>
   );
 };

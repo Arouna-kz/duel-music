@@ -2,6 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Eye } from "lucide-react";
+import { formatTz } from "@/lib/datetime";
+import { getUiPrefs } from "@/hooks/useUiPreferences";
 
 interface DetailDialogProps {
   title: string;
@@ -15,10 +17,11 @@ export const DetailDialog = ({ title, data, triggerText }: DetailDialogProps) =>
     if (typeof value === "boolean") return value ? "Oui" : "Non";
     if (typeof value === "object") return JSON.stringify(value, null, 2);
     if (key.includes("date") || key.includes("_at")) {
-      return new Date(value).toLocaleString("fr-FR");
+      const lang = (typeof document !== "undefined" && document.documentElement.lang === "en") ? "en" : "fr";
+      return formatTz(value, "dd MMM yyyy HH:mm", { timezone: getUiPrefs().timezone, language: lang as "fr" | "en" });
     }
     if (key.includes("amount") || key.includes("price") || key.includes("earnings") || key.includes("balance")) {
-      return `${value} €`;
+      return `${value} $`;
     }
     return String(value);
   };
