@@ -1,3 +1,12 @@
+/**
+ * Admin: ReferralConfigManager — configuration du programme de parrainage.
+ *
+ * Édite `platform_settings.referral_config` : bonus parrain, bonus filleul,
+ * seuil minimum de recharge déclenchant la récompense. Les crédits sont
+ * versés via RPC atomique au moment de la qualification.
+ *
+ * @access  role=admin
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

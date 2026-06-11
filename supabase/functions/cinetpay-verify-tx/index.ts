@@ -1,3 +1,17 @@
+/**
+ * Edge Function: cinetpay-verify-tx
+ *
+ * Admin-only diagnostic: re-checks a CinetPay transaction (PayIn or PayOut)
+ * against `/v1/payment/{id}` or `/v1/transfer/{id}` using the country's OAuth
+ * credentials, then returns the raw verification payload. Used to reconcile
+ * stuck or contested transactions from `CinetPayAdminPanel.tsx`.
+ *
+ * @endpoint POST /functions/v1/cinetpay-verify-tx
+ * @auth     Bearer JWT — must hold `admin` role in `user_roles`.
+ * @body     { merchant_transaction_id: string }
+ * @returns  application/json — raw CinetPay verify response.
+ * @see      supabase/functions/_shared/cinetpay.ts (`cinetpayFetch`)
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, cinetpayFetch, type CountryConfig } from "../_shared/cinetpay.ts";
 

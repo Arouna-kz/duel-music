@@ -1,3 +1,20 @@
+/**
+ * useLiveKit
+ * ----------
+ * Hook central pour toute connexion à LiveKit Cloud SFU (lives, concerts, duels).
+ *
+ * Responsabilités :
+ *  - Récupère un token signé via l'edge function `livekit-token`
+ *    (payload : identity, room, role, permissions)
+ *  - Connecte la `Room` avec adaptive stream + dynacast
+ *  - Publie/déconnecte les tracks locaux (`buildLocalStream` côté caméra)
+ *  - Expose participants distants, états de connexion, et helpers (mute,
+ *    replaceTrack pour flip caméra, leave)
+ *  - Re-tente automatiquement sur déconnexion réseau
+ *
+ * @see supabase/functions/livekit-token/index.ts
+ * @see mem://tech-stack/livekit-sfu-infrastructure
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Room,

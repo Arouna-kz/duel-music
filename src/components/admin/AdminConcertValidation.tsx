@@ -1,3 +1,13 @@
+/**
+ * Admin: AdminConcertValidation — validation des concerts soumis par les artistes.
+ *
+ * Liste les concerts en attente (`concerts.status = 'pending'`), permet
+ * d'approuver/refuser avec motif. L'approbation déclenche les CRONs de
+ * rappel (`concert-reminders`) et la notification de démarrage
+ * (`notify-concert-start`).
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

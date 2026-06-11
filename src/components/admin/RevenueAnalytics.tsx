@@ -1,3 +1,13 @@
+/**
+ * Admin: RevenueAnalytics — analytics de revenus plateforme.
+ *
+ * Agrège les transactions financières (recharges, votes, cadeaux,
+ * abonnements, billets concert) sur des fenêtres temporelles configurables,
+ * avec drill-down par fournisseur (Stripe/CinetPay/Moneroo) et par rôle.
+ * Lecture seule via vues Postgres `security_invoker = true`.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

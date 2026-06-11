@@ -1,5 +1,14 @@
-// Moneroo official catalog (Deno mirror of src/lib/moneroo-config.ts).
-// Sandbox toggle via env MONEROO_SANDBOX (defaults to "true"). Set to "false" in prod.
+/**
+ * Moneroo official method catalog — Deno mirror of `src/lib/moneroo-config.ts`.
+ *
+ * Centralizes the supported PayIn / PayOut method codes, the field name
+ * expected by each method (`msisdn` vs `account_number`), and the canonical
+ * currency per method (defaults to XOF). Sandbox vs production is toggled
+ * via the `MONEROO_SANDBOX` env var (defaults to "true").
+ *
+ * @env      MONEROO_SANDBOX ("true"|"false")
+ * @see      src/lib/moneroo-config.ts, supabase/functions/moneroo-payin-init
+ */
 
 export const MONEROO_SANDBOX =
   (Deno.env.get("MONEROO_SANDBOX") ?? "true").toLowerCase() !== "false";

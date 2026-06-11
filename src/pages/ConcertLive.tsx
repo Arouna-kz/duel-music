@@ -1,3 +1,25 @@
+/**
+ * Page: ConcertLive (/concerts/:id/live)
+ *
+ * Diffusion live d'un concert programmé (table `concerts`). L'hôte (artiste)
+ * publie via `WebRTCHost` (LiveKit SFU) ; les spectateurs consomment via
+ * `WebRTCViewer`. Inclut chat, cadeaux (`ConcertGiftPanel`), pourboires
+ * rapides (`QuickTip`), classement donateurs (`GiftLeaderboard`), minuteur
+ * de durée (`ConcertDurationTimer`), enregistrement (`ConcertRecordingControls`)
+ * et persistance des likes (`live_likes`).
+ *
+ * Garde-fous d'accès :
+ *   - `ScheduledAccessGate` : bloque l'entrée hors fenêtre programmée.
+ *   - `BannedAccessGate`    : bloque les utilisateurs bannis du stream.
+ *   - `LiveReportButton`    : signalement → modération (auto-stop à 75%).
+ *
+ * Le compteur de viewers s'appuie sur Supabase Presence ; identité affichée
+ * via la RPC `get_display_profiles`.
+ *
+ * @route   /concerts/:id/live
+ * @see     src/components/concert/WebRTCHost.tsx, WebRTCViewer.tsx
+ * @see     supabase/functions/notify-concert-start, concert-reminders
+ */
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -24,6 +46,8 @@ import { FloatingEmojis, EmojiReactionBar, useBroadcastEmojis } from "@/componen
 import { TopDonorBubble } from "@/components/animations/TopDonorBubble";
 import { SponsorAdBroadcast } from "@/components/sponsor/SponsorAdBroadcast";
 import { ScheduledAccessGate } from "@/components/scheduling/ScheduledAccessGate";
+import { BannedAccessGate } from "@/components/streaming/BannedAccessGate";
+import { LiveReportButton } from "@/components/streaming/LiveReportButton";
 import { SponsorAdHistoryPanel } from "@/components/sponsor/SponsorAdHistoryPanel";
 import { FullscreenButton } from "@/components/streaming/FullscreenButton";
 import { SpeakingTimerOverlay } from "@/components/streaming/SpeakingTimerOverlay";
@@ -470,6 +494,7 @@ const ConcertLive = () => {
           isAuthenticated={!!currentUserId}
           onPurchased={() => setHasTicket(true)}
         />
+        <BannedAccessGate streamType="concert" streamId={id!} currentUserId={currentUserId} />
         <div className="relative w-full h-full" ref={videoContainerRef}>
           {/* Video stream */}
           {isOrganizer && currentUserId ? (
@@ -580,6 +605,7 @@ const ConcertLive = () => {
         isAuthenticated={!!currentUserId}
         onPurchased={() => setHasTicket(true)}
       />
+      <BannedAccessGate streamType="concert" streamId={id!} currentUserId={currentUserId} />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-8">
         <div className="flex items-center justify-between mb-4">
@@ -710,6 +736,13 @@ const ConcertLive = () => {
                       {t("leaveConcert")}
                     </Button>
                   )}
+
+                  <LiveReportButton
+                    streamType="concert"
+                    liveId={id!}
+                    viewerCount={viewerCount}
+                    isArtist={!!isOrganizer}
+                  />
                 </div>
               </CardContent>
             </Card>

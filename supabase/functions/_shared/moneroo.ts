@@ -1,5 +1,14 @@
-// Shared Moneroo client
-// Docs: https://docs.moneroo.io/
+/**
+ * Shared Moneroo HTTP client used by every `moneroo-*` edge function.
+ *
+ * Wraps the Moneroo v1 REST API (https://api.moneroo.io/v1) with Bearer auth
+ * sourced from `MONEROO_SECRET_KEY`. Exposes helpers for merchant id
+ * generation, signed POST/GET, and CORS headers. PayIn/PayOut callbacks are
+ * authenticated via HMAC-SHA256 against `MONEROO_WEBHOOK_SECRET`.
+ *
+ * @see      supabase/functions/moneroo-payin-init, moneroo-payout-init
+ * @env      MONEROO_SECRET_KEY
+ */
 const MONEROO_BASE = "https://api.moneroo.io/v1";
 
 export const corsHeaders = {

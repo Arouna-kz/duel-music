@@ -1,3 +1,12 @@
+/**
+ * useWebRTCSignaling
+ * ------------------
+ * Canal de signalisation Supabase Realtime pour échanger SDP offers/answers
+ * et candidats ICE entre pairs WebRTC (utilisé par `useWebRTC`).
+ *
+ * Convention : un channel par room (`signaling:{roomId}`), broadcast
+ * d'évènements typés `offer` | `answer` | `ice-candidate`.
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 

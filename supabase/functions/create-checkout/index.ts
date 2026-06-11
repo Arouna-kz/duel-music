@@ -1,3 +1,18 @@
+/**
+ * Edge Function: create-checkout
+ *
+ * Creates a Stripe Checkout Session for a credit recharge (one-shot purchase).
+ * Amount and currency are derived from `economic_config` (credit_value_usd +
+ * provider fees) and `exchange_rates`. The returned `url` is opened in a new
+ * tab; final settlement happens via `stripe-webhook` → `wallets` credit.
+ *
+ * @endpoint POST /functions/v1/create-checkout
+ * @body     { credits: number; currency?: string; successUrl?: string; cancelUrl?: string }
+ * @returns  { url: string; sessionId: string }
+ * @env      STRIPE_SECRET_KEY
+ * @see      supabase/functions/stripe-webhook (settlement handler)
+ * @see      src/pages/WalletRecharge.tsx
+ */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";

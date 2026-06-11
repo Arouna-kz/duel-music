@@ -1,3 +1,11 @@
+/**
+ * Admin: ContactInfoManager — édite les infos de contact publiques.
+ *
+ * Email support, téléphone, adresse, horaires — stockés dans
+ * `platform_settings.contact_info` et affichés sur `/contact` et footer.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

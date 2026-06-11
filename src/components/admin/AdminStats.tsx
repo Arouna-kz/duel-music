@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminStats — vue d'ensemble chiffrée de la plateforme.
+ *
+ * KPIs temps réel : utilisateurs, artistes, lives actifs, revenus 24h/30j,
+ * tickets vendus, dédicaces. Source pour le rapport quotidien envoyé par
+ * `admin-daily-report` (CRON via `pg_cron`/`pg_net`).
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminGiftsManager — catalogue des cadeaux virtuels.
+ *
+ * CRUD de la table `virtual_gifts` : nom, icône, prix en crédits, tier
+ * d'animation (déclenche les portails z-index 220 côté stream). Les
+ * achats restent atomiques via RPC pour éviter les races.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

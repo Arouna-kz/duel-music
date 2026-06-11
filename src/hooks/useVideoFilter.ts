@@ -1,3 +1,14 @@
+/**
+ * useVideoFilter
+ * --------------
+ * Applique un filtre vidéo en temps réel sur la track caméra LiveKit
+ * (sépia, noir & blanc, blur, beauty, …) via un `TrackProcessor` Canvas.
+ *
+ * Le filtre est appliqué AVANT publication SFU, donc visible par tous les
+ * spectateurs. Bascule à chaud via `setFilter(id)` sans re-publier la track.
+ *
+ * @see src/lib/videoFilters.ts
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { Room } from "livekit-client";
 import {

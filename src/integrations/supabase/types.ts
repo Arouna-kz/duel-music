@@ -1555,23 +1555,35 @@ export type Database = {
       live_reports: {
         Row: {
           created_at: string
+          details: string | null
           id: string
           live_id: string
           reason: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          details?: string | null
           id?: string
           live_id: string
           reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           user_id: string
         }
         Update: {
           created_at?: string
+          details?: string | null
           id?: string
           live_id?: string
           reason?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
           user_id?: string
         }
         Relationships: []
@@ -1802,7 +1814,9 @@ export type Database = {
         Row: {
           avatar_url: string | null
           banned_at: string | null
+          banned_is_permanent: boolean
           banned_reason: string | null
+          banned_until: string | null
           bio: string | null
           country_code: string | null
           created_at: string | null
@@ -1821,7 +1835,9 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           banned_at?: string | null
+          banned_is_permanent?: boolean
           banned_reason?: string | null
+          banned_until?: string | null
           bio?: string | null
           country_code?: string | null
           created_at?: string | null
@@ -1840,7 +1856,9 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           banned_at?: string | null
+          banned_is_permanent?: boolean
           banned_reason?: string | null
+          banned_until?: string | null
           bio?: string | null
           country_code?: string | null
           created_at?: string | null

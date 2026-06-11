@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminLogs — journal d'audit des actions admin.
+ *
+ * Lecture filtrée de `admin_logs` (acteur, action, cible, payload, date),
+ * permettant la traçabilité complète des opérations sensibles : bans,
+ * suppressions, validations, ajustements de configuration.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminTable } from "@/components/admin/AdminTable";

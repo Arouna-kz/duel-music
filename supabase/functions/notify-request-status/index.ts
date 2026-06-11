@@ -1,3 +1,15 @@
+/**
+ * Edge Function: notify-request-status
+ *
+ * Sends a status-update notification (in-app + email) when an admin reviews a
+ * user-submitted request: artist validation, manager validation, withdrawal
+ * approval/refusal, sponsor application, etc.
+ *
+ * @endpoint POST /functions/v1/notify-request-status
+ * @body     { userId: string; requestType: string; status: "approved"|"refused"; reason?: string }
+ * @returns  { success: boolean }
+ * @see      src/components/profile/RequestTracker.tsx
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

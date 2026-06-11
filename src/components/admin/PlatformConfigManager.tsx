@@ -1,3 +1,18 @@
+/**
+ * PlatformConfigManager
+ * ---------------------
+ * Éditeur des réglages globaux stockés dans `platform_settings` (clé/valeur JSON).
+ *
+ * Clés gérées ici :
+ *  - `vote_config`     : { price_per_vote, min_votes, max_votes }
+ *  - `report_config`   : { enabled_on: { live, concert, duel }, viewer_threshold }
+ *  - `welcome_config`  : crédits offerts à l'inscription
+ *  - `pricing_config`  : toggle d'affichage de la page Pricing
+ *  - ... (extensible)
+ *
+ * Toutes les modifications sont auditées dans `admin_logs`.
+ * Les composants front lisent ces valeurs via `usePlatformConfig` / `usePlatformSettings`.
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Coins, CreditCard, Save, Network, RefreshCcw, Loader2, Wallet, Banknote, Smartphone, Plus, Trash2 } from "lucide-react";
+import { Settings, Coins, CreditCard, Save, Network, RefreshCcw, Loader2, Wallet, Banknote, Smartphone, Plus, Trash2, Vote, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,6 +51,32 @@ const DEFAULT_WD: WithdrawalProvidersConfig = {
   stripe: { enabled: true, min_amount_credits: 200, mode: "manual" },
 };
 
+interface VoteConfig {
+  price_per_vote: number;
+  min_votes_per_tx: number;
+  max_votes_per_tx: number;
+}
+const DEFAULT_VOTE_CONFIG: VoteConfig = {
+  price_per_vote: 1,
+  min_votes_per_tx: 1,
+  max_votes_per_tx: 1000,
+};
+
+interface LiveReportConfig {
+  enabled_live: boolean;
+  enabled_concert: boolean;
+  enabled_duel: boolean;
+  viewer_threshold: number;
+  stop_percentage: number;
+}
+const DEFAULT_LIVE_REPORT_CONFIG: LiveReportConfig = {
+  enabled_live: true,
+  enabled_concert: true,
+  enabled_duel: true,
+  viewer_threshold: 5,
+  stop_percentage: 75,
+};
+
 const PlatformConfigManager = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -45,6 +86,8 @@ const PlatformConfigManager = () => {
   const [providers, setProviders] = useState<PaymentProvidersConfig>({ cinetpay_enabled: true, moneroo_enabled: false, stripe_enabled: true });
   const [withdrawalCfg, setWithdrawalCfg] = useState<WithdrawalProvidersConfig>(DEFAULT_WD);
   const [payoutCfg, setPayoutCfg] = useState<PayoutConfig>(DEFAULT_PAYOUT_CONFIG);
+  const [voteCfg, setVoteCfg] = useState<VoteConfig>(DEFAULT_VOTE_CONFIG);
+  const [liveReportCfg, setLiveReportCfg] = useState<LiveReportConfig>(DEFAULT_LIVE_REPORT_CONFIG);
 
   const [proxyEnabled, setProxyEnabled] = useState<boolean>(false);
   const [proxyLoading, setProxyLoading] = useState(false);
@@ -56,7 +99,7 @@ const PlatformConfigManager = () => {
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [welcomeRes, pricingRes, concertRes, proxyRes, providersRes, wdRes, payoutRes] = await Promise.all([
+    const [welcomeRes, pricingRes, concertRes, proxyRes, providersRes, wdRes, payoutRes, voteRes, reportRes] = await Promise.all([
       supabase.from("platform_settings").select("value").eq("key", "welcome_config").single(),
       supabase.from("platform_settings").select("value").eq("key", "pricing_config").single(),
       supabase.from("platform_settings").select("value").eq("key", "concert_approval_config").maybeSingle(),
@@ -64,6 +107,8 @@ const PlatformConfigManager = () => {
       supabase.from("platform_settings").select("value").eq("key", "payment_providers_config").maybeSingle(),
       supabase.from("platform_settings").select("value").eq("key", "withdrawal_providers_config").maybeSingle(),
       supabase.from("platform_settings").select("value").eq("key", "payout_config").maybeSingle(),
+      supabase.from("platform_settings").select("value").eq("key", "vote_config").maybeSingle(),
+      supabase.from("platform_settings").select("value").eq("key", "live_report_config").maybeSingle(),
     ]);
 
     if (welcomeRes.data?.value) {
@@ -103,6 +148,24 @@ const PlatformConfigManager = () => {
       setPayoutCfg({
         methods: Array.isArray(v.methods) && v.methods.length > 0 ? (v.methods as PayoutMethodCode[]) : DEFAULT_PAYOUT_CONFIG.methods,
         mobile_operators: Array.isArray(v.mobile_operators) && v.mobile_operators.length > 0 ? (v.mobile_operators as PayoutOperator[]) : DEFAULT_PAYOUT_CONFIG.mobile_operators,
+      });
+    }
+    if (voteRes.data?.value) {
+      const v = voteRes.data.value as Partial<VoteConfig>;
+      setVoteCfg({
+        price_per_vote: Number(v.price_per_vote ?? DEFAULT_VOTE_CONFIG.price_per_vote) || 1,
+        min_votes_per_tx: Number(v.min_votes_per_tx ?? DEFAULT_VOTE_CONFIG.min_votes_per_tx) || 1,
+        max_votes_per_tx: Number(v.max_votes_per_tx ?? DEFAULT_VOTE_CONFIG.max_votes_per_tx) || 1000,
+      });
+    }
+    if (reportRes.data?.value) {
+      const v = reportRes.data.value as Partial<LiveReportConfig>;
+      setLiveReportCfg({
+        enabled_live: v.enabled_live ?? true,
+        enabled_concert: v.enabled_concert ?? true,
+        enabled_duel: v.enabled_duel ?? true,
+        viewer_threshold: Number(v.viewer_threshold ?? DEFAULT_LIVE_REPORT_CONFIG.viewer_threshold) || 5,
+        stop_percentage: Number(v.stop_percentage ?? DEFAULT_LIVE_REPORT_CONFIG.stop_percentage) || 75,
       });
     }
     setLoading(false);
@@ -165,8 +228,23 @@ const PlatformConfigManager = () => {
       methods: payoutCfg.methods,
       mobile_operators: payoutCfg.mobile_operators.filter((o) => o.code.trim() && o.label.trim()),
     } as unknown as Json;
+    const voteJson: Json = {
+      price_per_vote: Math.max(1, Math.floor(voteCfg.price_per_vote)),
+      min_votes_per_tx: Math.max(1, Math.floor(voteCfg.min_votes_per_tx)),
+      max_votes_per_tx: Math.max(
+        Math.max(1, Math.floor(voteCfg.min_votes_per_tx)),
+        Math.floor(voteCfg.max_votes_per_tx)
+      ),
+    };
+    const liveReportJson: Json = {
+      enabled_live: liveReportCfg.enabled_live,
+      enabled_concert: liveReportCfg.enabled_concert,
+      enabled_duel: liveReportCfg.enabled_duel,
+      viewer_threshold: Math.max(1, Math.floor(liveReportCfg.viewer_threshold)),
+      stop_percentage: Math.min(100, Math.max(1, Math.floor(liveReportCfg.stop_percentage))),
+    };
 
-    const [r1, r2, r3, r4, r5, r6] = await Promise.all([
+    const [r1, r2, r3, r4, r5, r6, r7, r8] = await Promise.all([
       supabase.from("platform_settings").upsert(
         { key: "welcome_config", value: welcomeJson, updated_at: now },
         { onConflict: "key" }
@@ -191,9 +269,17 @@ const PlatformConfigManager = () => {
         { key: "payout_config", value: payoutJson, updated_at: now },
         { onConflict: "key" }
       ),
+      supabase.from("platform_settings").upsert(
+        { key: "vote_config", value: voteJson, updated_at: now },
+        { onConflict: "key" }
+      ),
+      supabase.from("platform_settings").upsert(
+        { key: "live_report_config", value: liveReportJson, updated_at: now },
+        { onConflict: "key" }
+      ),
     ]);
 
-    const err = r1.error || r2.error || r3.error || r4.error || r5.error || r6.error;
+    const err = r1.error || r2.error || r3.error || r4.error || r5.error || r6.error || r7.error || r8.error;
     if (err) {
       toast({ title: t("error"), description: err.message, variant: "destructive" });
     } else {
@@ -485,6 +571,98 @@ const PlatformConfigManager = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Vote configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Vote className="w-5 h-5" /> Configuration des votes</CardTitle>
+          <CardDescription>Définissez le prix d'un vote (en crédits) et le nombre minimum/maximum de votes autorisés par transaction.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Label className="text-sm">Prix par vote (crédits)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={voteCfg.price_per_vote}
+                onChange={(e) => setVoteCfg({ ...voteCfg, price_per_vote: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Minimum de votes / transaction</Label>
+              <Input
+                type="number"
+                min={1}
+                value={voteCfg.min_votes_per_tx}
+                onChange={(e) => setVoteCfg({ ...voteCfg, min_votes_per_tx: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Maximum de votes / transaction</Label>
+              <Input
+                type="number"
+                min={1}
+                value={voteCfg.max_votes_per_tx}
+                onChange={(e) => setVoteCfg({ ...voteCfg, max_votes_per_tx: parseInt(e.target.value) || 1 })}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Coût total = nombre de votes × prix par vote. Le panneau de vote des duels applique automatiquement ces valeurs.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Live report configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5" /> Signalement d'événements</CardTitle>
+          <CardDescription>
+            Activez ou désactivez le signalement par les spectateurs pour chaque type d'événement, et ajustez les seuils d'auto-arrêt.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {([
+            { key: "enabled_live" as const, label: "Lives spontanés" },
+            { key: "enabled_concert" as const, label: "Concerts" },
+            { key: "enabled_duel" as const, label: "Duels" },
+          ]).map((row) => (
+            <div key={row.key} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <Label className="text-base">{row.label}</Label>
+              <Switch
+                checked={liveReportCfg[row.key]}
+                onCheckedChange={(v) => setLiveReportCfg({ ...liveReportCfg, [row.key]: v })}
+              />
+            </div>
+          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Seuil de spectateurs (bouton visible)</Label>
+              <Input
+                type="number"
+                min={1}
+                value={liveReportCfg.viewer_threshold}
+                onChange={(e) => setLiveReportCfg({ ...liveReportCfg, viewer_threshold: parseInt(e.target.value) || 1 })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Défaut : 5 spectateurs.</p>
+            </div>
+            <div>
+              <Label className="text-sm">% de signalements pour auto-stop</Label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={liveReportCfg.stop_percentage}
+                onChange={(e) => setLiveReportCfg({ ...liveReportCfg, stop_percentage: parseInt(e.target.value) || 75 })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Défaut : 75 %. Arrêt 5 min après franchissement.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+
 
 
       <Button onClick={saveAll} disabled={saving} className="w-full">

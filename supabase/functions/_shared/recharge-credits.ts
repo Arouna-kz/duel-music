@@ -1,5 +1,18 @@
-// Shared recharge credit computation respecting admin economic_config.
-// 1 credit = credit_value_usd USD (admin barème). Fee % is deducted before conversion.
+/**
+ * Shared credit-computation helper for wallet recharges.
+ *
+ * Honors the admin-controlled `platform_settings.economic_config`:
+ *   - `credit_value_usd`        — USD price of 1 credit (default 0.01).
+ *   - `recharge.fee_pct`        — global fee % deducted before conversion.
+ *   - `recharge.provider_fees`  — per-provider overrides (cinetpay/moneroo/stripe).
+ *
+ * Conversion: USD-equivalent is derived from `exchange_rates(currency_code, rate_per_usd)`,
+ * then floored to the nearest credit. Used by every `*-payin-init` and the
+ * `RechargeBreakdown.tsx` preview.
+ *
+ * @returns { credits, feePct, netAmount, netUsd, creditValueUsd }
+ * @see      src/components/wallet/RechargeBreakdown.tsx, src/hooks/useRechargePreview.ts
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 export type ProviderKey = "cinetpay" | "moneroo" | "stripe";

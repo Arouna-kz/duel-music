@@ -1,3 +1,17 @@
+/**
+ * Edge Function: welcome-email
+ *
+ * Sent right after a new user completes signup. Renders a branded onboarding
+ * email via Resend and (optionally) credits the welcome bonus defined in
+ * `platform_settings.welcome_config` (default 100 credits) by calling the
+ * `grant_welcome_bonus` RPC server-side.
+ *
+ * @endpoint POST /functions/v1/welcome-email
+ * @body     { userId: string; email: string; fullName?: string }
+ * @returns  { success: boolean; emailSent: boolean; bonusGranted?: number }
+ * @env      RESEND_API_KEY
+ * @see      src/components/onboarding/WelcomeOnboarding.tsx
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

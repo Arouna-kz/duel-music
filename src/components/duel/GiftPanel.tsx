@@ -1,3 +1,19 @@
+/**
+ * GiftPanel (Duel)
+ * ----------------
+ * Panneau d'envoi de cadeaux virtuels pendant un duel. Charge le catalogue
+ * depuis `gifts` (filtré par disponibilité admin) et appelle le RPC
+ * `send_duel_gift` qui débite le wallet, crédite l'artiste cible (part %),
+ * journalise la transaction et diffuse l'animation à tous les spectateurs
+ * via un canal Realtime broadcast.
+ *
+ * Tier d'animation déterminé par `gifts.price_tier` (low/mid/high/legendary)
+ * — gère l'intensité visuelle dans GiftAnimationWithSound.
+ *
+ * @prop duelId    - id du duel
+ * @prop artist1   - artiste cible possible (gauche)
+ * @prop artist2   - artiste cible possible (droite)
+ */
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

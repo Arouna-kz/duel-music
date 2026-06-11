@@ -1,3 +1,13 @@
+/**
+ * Admin: SubscriptionPlansManager — CRUD des plans d'abonnement.
+ *
+ * Gère la table `subscription_plans` (Free, Pro, Premium) : prix, quotas
+ * de votes, avantages, statut actif. Les gates côté client (vote, accès
+ * fonctionnalités) consultent ces plans via `useSubscription`.
+ *
+ * @access  role=admin
+ * @see     src/hooks/useSubscription.ts
+ */
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

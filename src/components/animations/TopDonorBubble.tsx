@@ -104,8 +104,10 @@ export const TopDonorBubble = ({ contextType, contextId, cooldownMs = 20000 }: P
   if (traversing) {
     return (
       <div
-        className="fixed left-0 right-0 z-[10020] pointer-events-none overflow-hidden"
-        style={{ top: "calc(env(safe-area-inset-top, 0px) + 3rem)" }}
+        className="fixed left-0 right-0 z-[10050] pointer-events-none overflow-hidden"
+        // Place the marquee just under the top action area on every screen size.
+        // On mobile we keep it close to the top so it isn't pushed off-screen by overlays.
+        style={{ top: "calc(env(safe-area-inset-top, 0px) + 4.25rem)" }}
       >
         <AnimatePresence mode="wait">
           {current && showCount > 0 && (
@@ -115,20 +117,20 @@ export const TopDonorBubble = ({ contextType, contextId, cooldownMs = 20000 }: P
               animate={{ x: "-110%", opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ x: { duration: 14, ease: "linear" }, opacity: { duration: 0.3 } }}
-              className="inline-flex"
+              className="inline-flex w-max max-w-none"
               style={{ willChange: "transform" }}
             >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 shadow-xl shadow-amber-500/40 border border-amber-200 whitespace-nowrap">
-                <Avatar className="w-6 h-6 sm:w-8 sm:h-8 ring-2 ring-white shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 shadow-xl shadow-amber-500/40 border border-amber-200 whitespace-nowrap">
+                <Avatar className="w-5 h-5 sm:w-8 sm:h-8 ring-2 ring-white shrink-0">
                   <AvatarImage src={current.avatar_url || ""} />
                   <AvatarFallback className="text-[10px]">{(current.full_name || "?")[0]}</AvatarFallback>
                 </Avatar>
-                <Crown className="w-3.5 h-3.5 text-amber-900 shrink-0" fill="currentColor" />
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-amber-900">Top donateur</span>
-                <span className="text-xs sm:text-sm font-extrabold text-amber-950">{current.full_name || "Anonyme"}</span>
-                <span className="text-xs sm:text-sm font-black text-amber-950">{Math.round(current.total_amount)} crédits</span>
+                <Crown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-900 shrink-0" fill="currentColor" />
+                <span className="text-[9px] sm:text-xs font-bold uppercase tracking-wider text-amber-900">Top donateur</span>
+                <span className="text-[11px] sm:text-sm font-extrabold text-amber-950">{current.full_name || "Anonyme"}</span>
+                <span className="text-[11px] sm:text-sm font-black text-amber-950">{Math.round(current.total_amount)} crédits</span>
                 {current.last_message?.trim() && (
-                  <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs italic text-amber-900/90">
+                  <span className="inline-flex items-center gap-1 text-[9px] sm:text-xs italic text-amber-900/90">
                     <MessageCircle className="w-3 h-3 shrink-0" /> «&nbsp;{current.last_message.trim()}&nbsp;»
                   </span>
                 )}

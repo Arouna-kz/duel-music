@@ -1,3 +1,13 @@
+/**
+ * Admin: LeaderboardSeasonsManager — gestion des saisons de classement.
+ *
+ * Crée/clôture les saisons (`leaderboard_seasons`), définit récompenses
+ * Top 3 et mystères, et lance le fulfillment post-compétition. Les
+ * gagnants sont gérés via `SeasonWinnersManager`.
+ *
+ * @access  role=admin
+ * @see     src/components/admin/SeasonWinnersManager.tsx
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

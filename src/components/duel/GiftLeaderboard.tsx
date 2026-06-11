@@ -1,3 +1,14 @@
+/**
+ * GiftLeaderboard
+ * ---------------
+ * Classement temps réel des top donateurs d'un duel.
+ * Souscrit aux changements de `duel_gifts` via Supabase Realtime et agrège
+ * par sender_id (somme des prix). Utilise `get_display_profiles` RPC pour
+ * obtenir nom + avatar respectant les préférences de visibilité.
+ *
+ * @prop duelId - id du duel à observer
+ * @prop limit  - nombre max de positions affichées (défaut 10)
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

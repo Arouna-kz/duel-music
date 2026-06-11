@@ -1,3 +1,17 @@
+/**
+ * Edge Function: cinetpay-webhook-payin
+ *
+ * Public callback registered with CinetPay (verify_jwt = false). On each
+ * notification, re-verifies the transaction via the `/v1/payment/check` API
+ * (canonical verification — never trust the raw POST body), then calls the
+ * `cinetpay_confirm_payin` RPC to atomically credit the user wallet and
+ * mark the `cinetpay_transactions` row as `succeeded` / `failed`.
+ *
+ * @endpoint POST /functions/v1/cinetpay-webhook-payin
+ * @body     application/x-www-form-urlencoded — CinetPay notification payload
+ * @returns  text/plain "OK" on success (provider expects 200 OK)
+ * @see      supabase/functions/cinetpay-payin-init
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, cinetpayFetch, timingSafeEqual, type CountryConfig } from "../_shared/cinetpay.ts";
 

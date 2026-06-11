@@ -69,6 +69,48 @@ const ApiDocs = () => {
       path: "/api/v1/chat/:duelId",
       description: "Envoyer un message dans le chat live",
       auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/livekit-token",
+      description: "Obtenir un token JWT LiveKit (SFU streaming)",
+      auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/send-push",
+      description: "Envoyer une notification Web Push (VAPID)",
+      auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/cinetpay-payin-init",
+      description: "Initialiser une recharge Mobile Money (CinetPay)",
+      auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/cinetpay-payout-init",
+      description: "Initialiser un retrait Mobile Money (CinetPay)",
+      auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/moneroo-payin-init",
+      description: "Initialiser une recharge Mobile Money (Moneroo)",
+      auth: true
+    },
+    {
+      method: "POST",
+      path: "/functions/v1/cinetpay-webhook-payin",
+      description: "Webhook CinetPay (vérification canonique)",
+      auth: false
+    },
+    {
+      method: "POST",
+      path: "/api/v1/push/subscribe",
+      description: "Enregistrer un abonnement push (endpoint + p256dh + auth)",
+      auth: true
     }
   ];
 

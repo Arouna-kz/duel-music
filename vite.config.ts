@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ["**/*.{js,css,ico,png,svg,jpg,jpeg,webp,woff,woff2}"],
         navigateFallback: null,
         navigateFallbackDenylist: [/./],
+        importScripts: ["/push-sw.js"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.mode === "navigate",

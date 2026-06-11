@@ -1,3 +1,15 @@
+/**
+ * Edge Function: concert-reminders (CRON)
+ *
+ * Scheduled via `pg_cron` + `pg_net`. Scans `concerts` whose `scheduled_time`
+ * falls inside the next reminder window (typically T-30min) and fans out
+ * `concert_reminder` events through `notify-user-event` to all ticket holders
+ * and followers of the host artist.
+ *
+ * @endpoint POST /functions/v1/concert-reminders
+ * @returns  { processed: number; notified: number }
+ * @see      supabase/functions/notify-user-event
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

@@ -1,3 +1,15 @@
+/**
+ * AccountReportButton
+ * -------------------
+ * Signale un profil utilisateur (typiquement un artiste) depuis sa page publique.
+ * Empêche l'auto-signalement et les doublons (contrainte unique reporter+target).
+ *
+ * Insère dans `account_reports`. Les signalements sont traités par
+ * `AccountReportsManager` côté admin (statuts: open / reviewed / dismissed).
+ *
+ * @prop targetUserId - id auth.users du profil signalé
+ * @prop className    - classes Tailwind optionnelles pour positionner le bouton
+ */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "lucide-react";

@@ -1,5 +1,18 @@
-// Moneroo PayIn init — creates a hosted checkout for Mobile Money + cards.
-// Docs: https://docs.moneroo.io/api-reference/payments/initialize
+/**
+ * Edge Function: moneroo-payin-init
+ *
+ * Initialize a Moneroo hosted checkout (Mobile Money + cards) for the
+ * authenticated user. Persists a pending row in `moneroo_transactions`,
+ * then calls Moneroo `/v1/payments/initialize`. Wallet credit happens
+ * in `moneroo-webhook-payin` after signature verification.
+ *
+ * @endpoint POST /functions/v1/moneroo-payin-init
+ * @body     { amount: number; method: string; currency?: string; phone?: string }
+ * @returns  { checkout_url: string; merchant_transaction_id: string }
+ * @env      MONEROO_API_KEY (or MONEROO_SANDBOX_API_KEY when sandbox)
+ * @see      supabase/functions/moneroo-webhook-payin/index.ts
+ * @see      docs https://docs.moneroo.io/api-reference/payments/initialize
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, genMerchantId, monerooCall } from "../_shared/moneroo.ts";
 import { MONEROO_SANDBOX, getCurrencyForMethod } from "../_shared/moneroo-catalog.ts";

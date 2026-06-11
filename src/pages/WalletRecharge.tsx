@@ -1,3 +1,27 @@
+/**
+ * Page: WalletRecharge (/wallet/recharge)
+ *
+ * Tunnel de recharge du portefeuille en crédits. Propose les trois fournisseurs
+ * actifs sur la plateforme selon le pays détecté et la configuration admin :
+ *   - Stripe (CB/Apple Pay/Google Pay) via `create-checkout` → `stripe-webhook`.
+ *   - CinetPay (Mobile Money Afrique) via `cinetpay-payin-init` →
+ *     `cinetpay-webhook-payin` → RPC `cinetpay_credit_wallet`.
+ *   - Moneroo (Mobile Money multi-pays) via `moneroo-payin-init` →
+ *     `moneroo-webhook-payin` → RPC `moneroo_confirm_payin`.
+ *
+ * Calcul des crédits en temps réel via `useRechargePreview` (`RechargeBreakdown`)
+ * qui applique `platform_settings.economic_config` (credit_value_usd, fees,
+ * provider overrides) et `exchange_rates`. Reçu post-paiement via
+ * `RechargeReceipt` (lecture du retour fournisseur sur l'URL).
+ *
+ * Aucune clé privée n'est exposée côté client : tout passe par les Edge
+ * Functions et les secrets Supabase Cloud.
+ *
+ * @route   /wallet/recharge
+ * @access  authenticated
+ * @see     src/components/wallet/CinetPayRechargeForm.tsx, MonerooRechargeForm.tsx
+ * @see     supabase/functions/_shared/recharge-credits.ts
+ */
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";

@@ -1,3 +1,16 @@
+/**
+ * Admin: CinetPayAdminPanel — administration de l'intégration CinetPay.
+ *
+ * Affiche les pays activés (`cinetpay_countries`), les soldes par pays
+ * (via `cinetpay-balances`), le statut du proxy à IP fixe
+ * (`cinetpay-proxy-check`), et permet de vérifier une transaction
+ * individuelle (`cinetpay-verify-tx`). Toggle admin
+ * `platform_settings.cinetpay_proxy_enabled` pour router le trafic via
+ * le proxy whitelisté.
+ *
+ * @access  role=admin
+ * @see     supabase/functions/_shared/cinetpay.ts
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

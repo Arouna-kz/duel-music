@@ -1,3 +1,16 @@
+/**
+ * usePlatformConfig
+ * -----------------
+ * Lit une clé typée de `platform_settings` (cache react-query 5 min).
+ * Pour des écritures admin, utiliser `PlatformConfigManager` qui invalide
+ * automatiquement le cache.
+ *
+ * Exemples de clés : `vote_config`, `report_config`, `welcome_config`,
+ * `pricing_config`, `economic_config`, `push_config`.
+ *
+ * @param key      - clé dans la table `platform_settings`
+ * @param fallback - valeur par défaut si la clé n'existe pas
+ */
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 

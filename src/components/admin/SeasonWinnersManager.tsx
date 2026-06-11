@@ -1,3 +1,12 @@
+/**
+ * Admin: SeasonWinnersManager — fulfillment des récompenses post-saison.
+ *
+ * Saisie/édition des podiums Top 3 d'une saison clôturée, attribution des
+ * récompenses physiques/virtuelles, marquage comme livrées. Lié à
+ * `LeaderboardSeasonsManager`.
+ *
+ * @access  role=admin
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

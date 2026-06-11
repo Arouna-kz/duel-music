@@ -1,3 +1,22 @@
+/**
+ * Edge Function: notify-user-event
+ *
+ * Centralized notification dispatcher. For a given `userId` + `type`, this
+ * function fans out across the channels enabled by the user's
+ * `email_notification_preferences` and `push_subscriptions`:
+ *   - In-app: inserts a row into `notifications` (Realtime UI bell).
+ *   - Push:   invokes `send-push` for registered Web Push endpoints.
+ *   - Email:  renders a typed template and ships via Resend.
+ *
+ * Event types include: `duel_scheduled`, `concert_starting`, `gift_received`,
+ * `vote_received`, `withdrawal_status`, `report_resolved`, `referral_bonus`, …
+ *
+ * @endpoint POST /functions/v1/notify-user-event
+ * @body     { userId: string; type: string; data: Record<string, unknown> }
+ * @returns  { success: boolean; channels: { inApp: boolean; push: boolean; email: boolean } }
+ * @env      RESEND_API_KEY (email), VAPID_* (push via send-push)
+ * @see      src/hooks/useTransactionNotifications.ts
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

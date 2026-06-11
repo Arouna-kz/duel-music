@@ -1,9 +1,17 @@
-// Diagnostic endpoint: returns the egress IP as seen FROM the proxy.
-// Call this once after configuring CINETPAY_PROXY_URL to discover the fixed IP
-// you must whitelist in your CinetPay dashboard.
-//
-//   curl -H "Authorization: Bearer <admin-jwt>" \
-//        https://<project>.supabase.co/functions/v1/cinetpay-proxy-check
+/**
+ * Edge Function: cinetpay-proxy-check
+ *
+ * Diagnostic endpoint that probes the egress IP both directly (Supabase) and
+ * via the optional CinetPay proxy (`CINETPAY_PROXY_URL`). Use this once after
+ * deploying the Fly.io proxy to discover the fixed IP to whitelist in the
+ * CinetPay dashboard.
+ *
+ * @endpoint GET /functions/v1/cinetpay-proxy-check
+ * @auth     Bearer JWT — admin only.
+ * @env      CINETPAY_PROXY_URL, CINETPAY_PROXY_TOKEN
+ * @returns  application/json { direct: {ip}, proxy: {ip} }
+ * @see      cinetpay-proxy/server.ts
+ */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders } from "../_shared/cinetpay.ts";

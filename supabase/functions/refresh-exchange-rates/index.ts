@@ -1,3 +1,15 @@
+/**
+ * Edge Function: refresh-exchange-rates
+ *
+ * Scheduled (pg_cron) job that pulls the latest USD-based exchange rates for
+ * all currencies the platform supports (USD/EUR/XOF/XAF/NGN/GHS/KES/...) and
+ * upserts them into `exchange_rates(currency_code, rate_per_usd)`. Consumed
+ * by `useCurrency`, `RechargeBreakdown`, and `computeCreditsForRecharge`.
+ *
+ * @endpoint POST /functions/v1/refresh-exchange-rates
+ * @returns  application/json { updated: number, rates: Record<string, number> }
+ * @see      src/hooks/useCurrency.ts, supabase/functions/_shared/recharge-credits.ts
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {

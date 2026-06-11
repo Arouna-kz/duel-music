@@ -1,3 +1,12 @@
+/**
+ * Admin: GiftsVotesSettingsView — vue combinée cadeaux + votes.
+ *
+ * Consolide les paramètres économiques des cadeaux virtuels et du vote
+ * payant en duel (prix unitaire, multiplicateurs, plafonds par plan
+ * d'abonnement) pour édition rapide.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

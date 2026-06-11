@@ -1,3 +1,11 @@
+/**
+ * Wallet: RechargeBreakdown — détail visuel d'une simulation de recharge.
+ *
+ * Affiche le montant brut, le pourcentage de frais (`fee_pct` global ou
+ * override fournisseur), le net en devise locale, l'équivalent USD et le
+ * nombre de crédits obtenus. Source : `useRechargePreview` qui reflète
+ * fidèlement la logique serveur (`_shared/recharge-credits.ts`).
+ */
 import type { RechargePreview } from "@/hooks/useRechargePreview";
 import { useLanguage } from "@/contexts/LanguageContext";
 

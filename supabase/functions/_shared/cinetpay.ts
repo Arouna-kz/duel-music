@@ -1,9 +1,30 @@
-// Shared CinetPay V2 (Seamless) OAuth client used by all cinetpay-* edge functions.
-// New unified API: https://api.cinetpay.net (sandbox) / https://api.cinetpay.co (prod)
-// Auth: POST /v1/oauth/login { api_key, api_password } -> { access_token }
-// PayIn: POST /v1/payment (Bearer) -> { payment_token, payment_url }
-// PayOut: POST /v1/transfer (Bearer)
-// Status: GET /v1/payment/{merchant_id} or /v1/transfer/{merchant_id}
+/**
+ * Shared CinetPay V2 (Seamless) OAuth client used by every `cinetpay-*` edge function.
+ *
+ * Endpoints:
+ *   - Auth:    POST /v1/oauth/login { api_key, api_password } -> { access_token }
+ *   - PayIn:   POST /v1/payment  (Bearer) -> { payment_token, payment_url }
+ *   - PayOut:  POST /v1/transfer (Bearer)
+ *   - Status:  GET  /v1/payment/{merchant_id} or /v1/transfer/{merchant_id}
+ *
+ * Base URL auto-detected from key prefix:
+ *   - sk_test_* → https://api.cinetpay.net (sandbox)
+ *   - sk_live_* → https://api.cinetpay.co  (production)
+ *
+ * Credentials are looked up per country from `cinetpay_countries` and read
+ * from Supabase secrets (`secret_key_name` / `secret_password_name`). Access
+ * tokens are cached in-memory for ~45 minutes per country.
+ *
+ * Optional egress proxy: when `CINETPAY_PROXY_URL` is set AND the admin
+ * toggle `platform_settings.cinetpay_proxy_enabled` is true, all CinetPay
+ * traffic is routed through the fixed-IP proxy (see `cinetpay-proxy/`) so
+ * CinetPay's IP whitelist remains stable.
+ *
+ * @env      CINETPAY_BASE_URL, CINETPAY_PROXY_URL, CINETPAY_PROXY_TOKEN
+ * @throws   CinetPayIpRejectedError — surfaces the backend egress IP so the
+ *           admin can whitelist it directly from the error message.
+ * @see      supabase/functions/cinetpay-payin-init, cinetpay-payout-init
+ */
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Users, Wallet, Gift, Trophy, Video, Music2, Play, Star, 
   LogIn, UserPlus, CreditCard, ShoppingCart, Award, Bell, 
-  Upload, Settings, Crown, Briefcase, Mic, Eye
+  Upload, Settings, Crown, Briefcase, Mic, Eye, Shield
 } from "lucide-react";
 
 const UserGuide = () => {
@@ -237,7 +237,7 @@ const UserGuide = () => {
             </Card>
 
             {/* Role-specific Guides */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Fan Guide */}
               <Card className="border-green-500/20">
                 <CardHeader>
@@ -293,6 +293,23 @@ const UserGuide = () => {
                   <p>✓ Activez caméra et micro</p>
                 </CardContent>
               </Card>
+
+              {/* Moderator Guide */}
+              <Card className="border-orange-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-orange-500">
+                    <Shield className="w-5 h-5" />
+                    Guide Modérateur
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm space-y-2">
+                  <p>✓ Examinez les signalements</p>
+                  <p>✓ Mute / ban en live</p>
+                  <p>✓ Stop auto live à 75% signalements</p>
+                  <p>✓ Avertissements progressifs</p>
+                  <p>✓ Consultez les logs admin</p>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Notifications */}
@@ -300,30 +317,58 @@ const UserGuide = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bell className="w-5 h-5 text-primary" />
-                  Notifications
+                  Notifications (in-app + Push)
                 </CardTitle>
-                <CardDescription>
-                  Restez informé en temps réel
-                </CardDescription>
+                <CardDescription>Restez informé même quand l'app est fermée</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-muted-foreground">
-                  L'icône de cloche dans la barre de navigation affiche vos notifications :
+                <p className="text-muted-foreground text-sm">
+                  L'icône de cloche affiche vos notifications in-app. Activez en plus les
+                  <strong> notifications push</strong> dans <em>Profil → Préférences → Notifications visuelles</em>
+                  pour les recevoir sur votre téléphone ou bureau, même sans avoir l'app ouverte.
                 </p>
                 <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-blue-500">Vote</Badge>
-                    Quand quelqu'un vote pour vous
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-pink-500">Cadeau</Badge>
-                    Quand vous recevez un cadeau
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Badge className="bg-yellow-500">Victoire</Badge>
-                    Quand vous gagnez un duel
-                  </li>
+                  <li className="flex items-center gap-2"><Badge className="bg-blue-500">Vote</Badge>Quand quelqu'un vote pour vous</li>
+                  <li className="flex items-center gap-2"><Badge className="bg-pink-500">Cadeau</Badge>Quand vous recevez un cadeau</li>
+                  <li className="flex items-center gap-2"><Badge className="bg-yellow-500">Victoire</Badge>Quand vous gagnez un duel</li>
+                  <li className="flex items-center gap-2"><Badge className="bg-purple-500">Live</Badge>Quand un artiste suivi démarre un live</li>
+                  <li className="flex items-center gap-2"><Badge className="bg-green-500">Paiement</Badge>Recharge ou retrait validé</li>
                 </ul>
+                <p className="text-xs p-2 bg-accent rounded">
+                  💡 Sur iPhone, installez d'abord l'app via <strong>Partager → Ajouter à l'écran d'accueil</strong> avant d'activer les push.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Recharges Mobile Money */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  Recharges Mobile Money & Retraits
+                </CardTitle>
+                <CardDescription>Orange Money, MTN, Moov, Wave, Stripe</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>• <strong>Recharger</strong> : Portefeuille → choisissez votre pays et opérateur → suivez le code USSD reçu sur votre téléphone.</p>
+                <p>• <strong>Retirer</strong> (Artistes / Managers) : Profil → Méthodes de retrait → ajoutez un numéro → demandez un retrait.</p>
+                <p>• Toutes les transactions apparaissent dans le tableau <strong>Transactions</strong> avec tri, recherche et pagination.</p>
+              </CardContent>
+            </Card>
+
+            {/* Installation PWA */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-primary" />
+                  Installer l'app (PWA)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p><strong>Android / Chrome</strong> : Menu ⋮ → "Installer l'application".</p>
+                <p><strong>iPhone / Safari</strong> : Partager ⬆ → "Sur l'écran d'accueil".</p>
+                <p><strong>Bureau</strong> : icône d'installation dans la barre d'adresse.</p>
+                <p className="text-xs p-2 bg-accent rounded">💡 Une fois installée, l'app s'ouvre en plein écran et reçoit les notifications push.</p>
               </CardContent>
             </Card>
 

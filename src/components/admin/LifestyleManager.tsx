@@ -1,3 +1,12 @@
+/**
+ * Admin: LifestyleManager — modération des vidéos lifestyle artistes.
+ *
+ * Liste paginée des VODs courts uploadés par les artistes, prévisualisation,
+ * suppression ou masquage. Les vues/likes sont mis à jour en temps réel
+ * via `useQuery` polling côté public.
+ *
+ * @access  role=admin
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

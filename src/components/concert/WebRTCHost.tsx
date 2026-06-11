@@ -1,3 +1,20 @@
+/**
+ * WebRTCHost (Concert)
+ * --------------------
+ * Composant côté ARTISTE pour diffuser un concert via LiveKit Cloud SFU.
+ *
+ * Responsabilités :
+ *  - Acquisition caméra/micro avec contraintes adaptatives (mobile vs desktop)
+ *  - Publication des tracks via `useLiveKit` (token signé par `livekit-token`)
+ *  - Gestion invités scène (HostGuestControls) : promouvoir/retirer des spectateurs
+ *  - Contrôles enregistrement (ConcertRecordingControls) → replay_videos
+ *  - Filtres vidéo temps réel via Canvas pipeline (useVideoFilter)
+ *  - Failsafe : auto-stop si durée concert dépassée (useConcertDuration)
+ *  - Portail z-index 220 pour animations cadeaux/votes au-dessus de la vidéo
+ *
+ * @see src/hooks/useLiveKit.ts
+ * @see mem://features/concert-platform
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useLiveKit } from "@/hooks/useLiveKit";
@@ -67,6 +84,7 @@ export const WebRTCHost = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [filterSlot, setFilterSlot] = useState<HTMLElement | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
@@ -104,12 +122,9 @@ export const WebRTCHost = ({
       console.log("Viewer left:", peerId);
     },
     onError: (error) => {
-      console.error("LiveKit error:", error);
-      toast({
-        title: "Erreur de connexion",
-        description: error,
-        variant: "destructive",
-      });
+      // Silent: do not surface low-level connection errors to viewers/hosts.
+      // The UI already shows a "connecting" state and will reconnect automatically.
+      console.warn("[WebRTCHost] LiveKit error:", error);
     },
   });
 
@@ -147,6 +162,8 @@ export const WebRTCHost = ({
   }, [localStream, onStreamReady]);
 
   const startStreaming = useCallback(async () => {
+    if (isStarting || isStreaming) return;
+    setIsStarting(true);
     try {
       // 1. Connect to the room FIRST
       await joinRoom();
@@ -177,8 +194,10 @@ export const WebRTCHost = ({
         description: "Impossible de démarrer le streaming. Vérifiez votre connexion.",
         variant: "destructive",
       });
+    } finally {
+      setIsStarting(false);
     }
-  }, [startLocalStream, joinRoom, onStreamStart, toast, streamType]);
+  }, [isStarting, isStreaming, startLocalStream, joinRoom, onStreamStart, toast, streamType]);
 
   const stopStreaming = useCallback(async () => {
     await leaveRoom();
@@ -301,9 +320,11 @@ export const WebRTCHost = ({
             <Radio className="w-16 h-16 text-white/50 mx-auto mb-4" />
             <p className="text-white text-xl font-bold">{t("readyToStart")}</p>
             <p className="text-white/70 mb-4">{t("clickToStartStream")}</p>
-            <Button onClick={startStreaming} size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-lg px-8 py-3">
-              <Video className="w-5 h-5 mr-2" />
-              {streamType === "live" ? t("startTheLive") : t("startTheConcert")}
+            <Button onClick={startStreaming} disabled={isStarting} size="lg" className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-lg px-8 py-3 disabled:opacity-60">
+              {isStarting ? <Radio className="w-5 h-5 mr-2 animate-pulse" /> : <Video className="w-5 h-5 mr-2" />}
+              {isStarting
+                ? (streamType === "live" ? (t("startingLive") || "Démarrage…") : (t("startingConcert") || "Démarrage…"))
+                : (streamType === "live" ? t("startTheLive") : t("startTheConcert"))}
             </Button>
           </div>
         </div>

@@ -1,3 +1,21 @@
+/**
+ * Edge Function: cinetpay-payin-init
+ *
+ * Initialize a CinetPay hosted-checkout PayIn (Mobile Money / Cards) for the
+ * authenticated user. Looks up per-country credentials in `cinetpay_countries`,
+ * generates a unique `merchant_transaction_id` + `notify_token`, persists a
+ * pending row in `cinetpay_transactions`, then calls CinetPay `/v2/payment`.
+ *
+ * On success the client receives the hosted payment URL. Final crediting of
+ * the wallet happens in `cinetpay-webhook-payin` (verified by `notify_token`).
+ *
+ * @endpoint POST /functions/v1/cinetpay-payin-init
+ * @body     { amount: number; currency: string; country_code: string; phone?: string }
+ * @returns  { payment_url: string; merchant_transaction_id: string }
+ * @throws   CinetPayIpRejectedError — proxy / IP allow-list misconfiguration
+ * @see      supabase/functions/cinetpay-webhook-payin/index.ts
+ * @see      src/components/wallet/CinetPayRechargeForm.tsx
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { CinetPayIpRejectedError, corsHeaders, cinetpayFetch, genMerchantId, genNotifyToken, type CountryConfig } from "../_shared/cinetpay.ts";
 

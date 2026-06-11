@@ -1,3 +1,14 @@
+/**
+ * Edge Function: assign-monthly-badges (CRON)
+ *
+ * Runs on the 1st of each month. Aggregates the previous month's gift volume
+ * per donor, ranks them and writes Top-Donor badges into `user_badges`
+ * (TOP_1 / TOP_3 / TOP_10) for visible recognition on profiles.
+ *
+ * @endpoint POST /functions/v1/assign-monthly-badges
+ * @returns  { month: string; badgesAssigned: number }
+ * @see      src/components/profile/UserBadges.tsx
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 

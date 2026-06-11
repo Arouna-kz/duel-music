@@ -1,3 +1,12 @@
+/**
+ * Admin: SocialLinksManager — édite les liens sociaux globaux.
+ *
+ * URL Instagram, TikTok, X, YouTube, etc. stockés dans
+ * `platform_settings.social_links` et affichés via `SocialLinksDisplay`
+ * dans le footer et les pages publiques.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

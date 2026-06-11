@@ -1,3 +1,13 @@
+/**
+ * useConcertDuration
+ * ------------------
+ * Timer côté client synchronisé avec `concerts.scheduled_time` + `duration_minutes`.
+ * Émet `onExpire()` quand la durée est dépassée → l'artiste host stoppe le live.
+ *
+ * Tolère drift réseau : recalcule à partir du serveur à chaque tick.
+ *
+ * @returns { remainingMs, formatted, expired }
+ */
 import { useState, useEffect, useCallback } from "react";
 
 export const useConcertDuration = (startedAt: string | null, isLive: boolean) => {

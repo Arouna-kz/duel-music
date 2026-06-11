@@ -1,3 +1,24 @@
+/**
+ * Page: LiveStream (/lives/:id)
+ *
+ * Salle d'un live spontané (table `lives`, distincte de `concerts`). Diffusion
+ * WebRTC via LiveKit SFU (`WebRTCHost` / `WebRTCViewer`) avec invitations
+ * d'invités en plateau (raise-hand, accept/deny via `HostGuestControls`).
+ *
+ * Fonctionnalités :
+ *   - Multi-cam : invités en thumbnails, flip cam (`replaceTrack`), mute/cam.
+ *   - Mobile : `VisualViewport` pour clavier stable, `MobileStreamOverlay`,
+ *     fullscreen via `FullscreenButton`.
+ *   - Engagement : cœurs/emojis broadcastés, cadeaux, pourboires, leaderboard.
+ *   - Modération : `BannedAccessGate`, `LiveReportButton` (auto-stop à 75%).
+ *
+ * Identité spectateur via la RPC `get_display_profiles`, comptage live via
+ * Supabase Presence.
+ *
+ * @route   /lives/:id
+ * @see     src/components/streaming/HostGuestControls.tsx
+ * @see     src/components/concert/WebRTCHost.tsx, WebRTCViewer.tsx
+ */
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +43,7 @@ import { FloatingEmojis, EmojiReactionBar, useBroadcastEmojis } from "@/componen
 import { TopDonorBubble } from "@/components/animations/TopDonorBubble";
 import { FullscreenButton } from "@/components/streaming/FullscreenButton";
 import { LiveReportButton } from "@/components/streaming/LiveReportButton";
+import { BannedAccessGate } from "@/components/streaming/BannedAccessGate";
 
 import { VideoZoomWrapper } from "@/components/streaming/VideoZoomWrapper";
 import { WebRTCHost } from "@/components/concert/WebRTCHost";
@@ -835,6 +857,7 @@ const LiveStream = () => {
 
   return (
     <div className={isMobile ? "fixed inset-0 bg-black z-50" : "min-h-screen bg-background"}>
+      <BannedAccessGate streamType="live" streamId={id!} currentUserId={currentUserId} />
       {!isMobile && <Header />}
       <main className={isMobile ? "w-full h-full" : "container mx-auto px-4 pt-24 pb-8"}>
         {!isMobile && (
@@ -1228,6 +1251,7 @@ const LiveStream = () => {
 
                     {/* Live report */}
                     <LiveReportButton
+                      streamType="live"
                       liveId={id!}
                       viewerCount={viewerCount}
                       isArtist={isArtist}

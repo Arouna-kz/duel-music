@@ -1,3 +1,22 @@
+/**
+ * WebRTCDuelStream
+ * ----------------
+ * Composant central du duel : orchestre les flux LiveKit des deux artistes,
+ * la composition vidéo (split screen), l'audio activity et les contrôles host.
+ *
+ * Architecture :
+ *  - LiveKit Cloud SFU (hook `useLiveKit`) pour pub/sub des tracks
+ *  - `useAudioActivity` détecte qui parle pour surligner la caméra active
+ *  - `replaceTrack` pour le flip caméra avant/arrière sans re-publier
+ *  - Hard Mute par le manager via canal Realtime broadcast
+ *  - Failsafe timer DB : auto-stop si la durée du duel est dépassée
+ *
+ * Exposé via `forwardRef` pour permettre au parent (DuelLive) de déclencher
+ * snapshot, stop, ou switch focus depuis l'overlay mobile.
+ *
+ * @see src/hooks/useLiveKit.ts
+ * @see mem://features/duel-system-flow
+ */
 import React, { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef, useMemo } from "react";
 import { useLiveKit } from "@/hooks/useLiveKit";
 import { useAudioActivity } from "@/hooks/useAudioActivity";
@@ -69,6 +88,7 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
@@ -103,7 +123,8 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
       }
     },
     onError: (error) => {
-      toast({ title: "Erreur de connexion", description: error, variant: "destructive" });
+      // Silent: connection retries are handled by the SDK, no need to alarm the user.
+      console.warn("[WebRTCDuelStream] LiveKit error:", error);
     },
   });
 
@@ -352,23 +373,29 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
   const toggleMicRef = useRef<() => void>();
 
   const startStreaming = useCallback(async () => {
-    if (localStream) {
-      toggleVideo(true);
-      toggleAudio(true);
-      setIsStreaming(true);
-      setIsCameraOn(true);
-      setIsMicOn(true);
-      toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
-      return;
+    if (isStarting || isStreaming) return;
+    setIsStarting(true);
+    try {
+      if (localStream) {
+        toggleVideo(true);
+        toggleAudio(true);
+        setIsStreaming(true);
+        setIsCameraOn(true);
+        setIsMicOn(true);
+        toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
+        return;
+      }
+      // Connect to room FIRST, then start local stream (so tracks get published)
+      await joinRoom();
+      const stream = await startLocalStream(true, true);
+      if (stream) {
+        setIsStreaming(true);
+        toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
+      }
+    } finally {
+      setIsStarting(false);
     }
-    // Connect to room FIRST, then start local stream (so tracks get published)
-    await joinRoom();
-    const stream = await startLocalStream(true, true);
-    if (stream) {
-      setIsStreaming(true);
-      toast({ title: "Caméra activée", description: "Vous êtes en direct!" });
-    }
-  }, [localStream, startLocalStream, joinRoom, toast, toggleVideo, toggleAudio]);
+  }, [isStarting, isStreaming, localStream, startLocalStream, joinRoom, toast, toggleVideo, toggleAudio]);
 
   const stopStreaming = useCallback(async () => {
     toggleVideo(false);
@@ -562,8 +589,8 @@ const WebRTCDuelStreamInner = forwardRef<WebRTCDuelStreamHandle, WebRTCDuelStrea
       {!hideControls && isCurrentUser && isParticipant && (
         <div className="absolute bottom-2 right-2 flex gap-1 z-20">
           {!isStreaming ? (
-            <Button onClick={startStreaming} size="sm" className="bg-gradient-primary text-xs h-7">
-              <Video className="w-3 h-3 mr-1" /> Go Live
+            <Button onClick={startStreaming} disabled={isStarting} size="sm" className="bg-gradient-primary text-xs h-7 disabled:opacity-60">
+              <Video className="w-3 h-3 mr-1" /> {isStarting ? "…" : "Go Live"}
             </Button>
           ) : (
             <>

@@ -1,3 +1,14 @@
+/**
+ * Admin: EconomicConfigManager — édite `platform_settings.economic_config`.
+ *
+ * Paramètres économiques globaux : `credit_value_usd`, frais de recharge
+ * (`recharge.fee_pct` + overrides par fournisseur), commissions duels,
+ * répartition revenus. Toute modification est journalisée dans `admin_logs`
+ * et impacte immédiatement les calculs côté Edge Functions
+ * (`_shared/recharge-credits.ts`) et le hook `useRechargePreview`.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

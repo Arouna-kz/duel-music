@@ -1,3 +1,15 @@
+/**
+ * Edge Function: cinetpay-balances
+ *
+ * Admin dashboard helper. Iterates every active row of `cinetpay_countries`
+ * and queries `/v1/balances` per country/currency via the shared OAuth client.
+ * Returns an aggregated balances report consumed by `CinetPayAdminPanel.tsx`.
+ *
+ * @endpoint GET /functions/v1/cinetpay-balances
+ * @auth     Bearer JWT — must hold `admin` role in `user_roles`.
+ * @returns  application/json { balances: Array<{country, currency, ok, data|error}> }
+ * @see      supabase/functions/_shared/cinetpay.ts
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, cinetpayFetch, type CountryConfig } from "../_shared/cinetpay.ts";
 

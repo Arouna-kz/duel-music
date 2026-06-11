@@ -1,3 +1,11 @@
+/**
+ * usePlatformSettings
+ * -------------------
+ * Variante batch de `usePlatformConfig` : récupère plusieurs clés en un seul
+ * round-trip, avec souscription Realtime aux modifications admin.
+ *
+ * Préférer ce hook quand un composant a besoin de >2 clés (évite N requêtes).
+ */
 import { useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";

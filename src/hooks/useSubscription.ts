@@ -1,3 +1,15 @@
+/**
+ * useSubscription
+ * ---------------
+ * État d'abonnement courant (Free / Pro / Premium) lu depuis
+ * `user_subscriptions` joint à `subscription_plans`.
+ *
+ * Expose les plafonds applicables (max_votes_per_duel, max_gifts_per_day, …)
+ * pour gating UI. La vérification d'effort est doublée côté RPC pour la
+ * sécurité — ne JAMAIS se reposer uniquement sur ce hook pour autoriser.
+ *
+ * @returns { plan, isPro, isPremium, limits, loading }
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";

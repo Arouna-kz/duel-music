@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminDedicationsManager — supervision des dédicaces.
+ *
+ * Vue globale des dédicaces fan→artiste : statut (en attente, livrée,
+ * remboursée), filtres, modération de contenu, remboursements manuels
+ * via RPC atomique en cas de litige.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

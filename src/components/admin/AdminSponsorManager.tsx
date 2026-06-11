@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminSponsorManager — modération des sponsors et de leurs annonces.
+ *
+ * Validation des demandes sponsor, gestion des tiers de prix (voir
+ * `SponsorPriceTiersManager`), diffusion programmée des pubs in-stream
+ * (`SponsorAdBroadcast`). Les actions sont journalisées dans `admin_logs`.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

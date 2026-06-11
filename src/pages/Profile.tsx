@@ -1,3 +1,28 @@
+/**
+ * Page: Profile (/profile)
+ *
+ * Tableau de bord personnel multi-rôles. Le rendu s'adapte au rôle de
+ * l'utilisateur (`ProfileRole`) : Fan, Artiste, Manager, Modérateur, Admin.
+ * Chaque rôle dispose de son propre `Sidebar` (couleurs, onglets) et de
+ * sections dédiées.
+ *
+ * Sections principales :
+ *   - Tous rôles : avatar, infos perso, préférences (langue, notifs, devise),
+ *     wallet unifié (Stripe/CinetPay/Moneroo), historique transactions,
+ *     badges donateurs, suivi des artistes, dédicaces reçues/envoyées.
+ *   - Artiste : validation, gestion concerts/lives, demandes de duel,
+ *     upload lifestyle, retraits (`WithdrawalForm`), revenus.
+ *   - Manager : profil public éditable, validation admin, duels assignés.
+ *   - Admin : redirection sidebar admin + stats profil.
+ *
+ * Sécurité : retrait protégé par PIN (`WithdrawalPinGate`), réinitialisation
+ * par email signé (`withdrawal-pin-reset`).
+ *
+ * @route   /profile
+ * @access  authenticated
+ * @see     src/components/profile/ProfileSidebar.tsx
+ * @see     src/components/artist/WithdrawalForm.tsx
+ */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -41,6 +66,7 @@ import SponsorRequestSection from "@/components/sponsor/SponsorRequestSection";
 import { CurrencySelector } from "@/components/profile/CurrencySelector";
 import PreferencesPanel from "@/components/profile/PreferencesPanel";
 import TransactionsPanel from "@/components/profile/TransactionsPanel";
+import MyVotesHistory from "@/components/profile/MyVotesHistory";
 import FanDedications from "@/components/profile/FanDedications";
 import RewardMeetingCard from "@/components/profile/RewardMeetingCard";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -649,6 +675,7 @@ const Profile = () => {
                 </TabsContent>
                 <TabsContent value="transactions" className="mt-6 space-y-6">
                   <TransactionsPanel />
+                  <MyVotesHistory />
                   {profile?.id && <FanDedications userId={profile.id} />}
                 </TabsContent>
               </Tabs>
@@ -679,23 +706,23 @@ const Profile = () => {
                 <TabsContent value="dashboard" className="space-y-6 mt-6">
                   {profile?.id && <RequestTracker userId={profile.id} />}
                   {profile?.id && <RewardMeetingCard userId={profile.id} />}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card className="p-5 text-center bg-gradient-to-br from-purple-500/10 to-pink-500/5 border-purple-500/20">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 relative isolate">
+                    <Card className="p-5 text-center bg-card bg-gradient-to-br from-purple-500/10 to-pink-500/5 border-purple-500/20 transform-gpu">
                       <TrendingUp className="w-8 h-8 mx-auto mb-2 text-purple-500" />
                       <p className="text-2xl font-bold">{artistStats.totalVotes}</p>
                       <p className="text-xs text-muted-foreground">{t("votesReceived")}</p>
                     </Card>
-                    <Card className="p-5 text-center bg-gradient-to-br from-pink-500/10 to-rose-500/5 border-pink-500/20">
+                    <Card className="p-5 text-center bg-card bg-gradient-to-br from-pink-500/10 to-rose-500/5 border-pink-500/20 transform-gpu">
                       <Gift className="w-8 h-8 mx-auto mb-2 text-pink-500" />
                       <p className="text-2xl font-bold">{artistStats.totalGifts}</p>
                       <p className="text-xs text-muted-foreground">{t("giftsReceived")}</p>
                     </Card>
-                    <Card className="p-5 text-center bg-gradient-to-br from-violet-500/10 to-purple-500/5 border-violet-500/20">
+                    <Card className="p-5 text-center bg-card bg-gradient-to-br from-violet-500/10 to-purple-500/5 border-violet-500/20 transform-gpu">
                       <Music2 className="w-8 h-8 mx-auto mb-2 text-violet-500" />
                       <p className="text-2xl font-bold">{artistStats.totalDuels}</p>
                       <p className="text-xs text-muted-foreground">{t("duels")}</p>
                     </Card>
-                    <Card className="p-5 text-center bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border-amber-500/20">
+                    <Card className="p-5 text-center bg-card bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border-amber-500/20 transform-gpu">
                       <Trophy className="w-8 h-8 mx-auto mb-2 text-amber-500" />
                       <p className="text-2xl font-bold">{artistStats.wonDuels}</p>
                       <p className="text-xs text-muted-foreground">{t("victories")}</p>
@@ -796,7 +823,7 @@ const Profile = () => {
                   <EmailNotificationPreferences userRoles={roles} />
                 </TabsContent>
                 <TabsContent value="preferences" className="mt-6"><PreferencesPanel /></TabsContent>
-                <TabsContent value="transactions" className="mt-6"><TransactionsPanel /></TabsContent>
+                <TabsContent value="transactions" className="mt-6 space-y-6"><TransactionsPanel /><MyVotesHistory /></TabsContent>
                 <TabsContent value="followed" className="mt-6"><FollowedArtists userId={profile?.id || ""} /></TabsContent>
               </Tabs>
             </div>
@@ -915,7 +942,7 @@ const Profile = () => {
                   <EmailNotificationPreferences userRoles={roles} />
                 </TabsContent>
                 <TabsContent value="preferences" className="mt-6"><PreferencesPanel /></TabsContent>
-                <TabsContent value="transactions" className="mt-6"><TransactionsPanel /></TabsContent>
+                <TabsContent value="transactions" className="mt-6 space-y-6"><TransactionsPanel /><MyVotesHistory /></TabsContent>
                 <TabsContent value="followed" className="mt-6"><FollowedArtists userId={profile?.id || ""} /></TabsContent>
               </Tabs>
             </div>

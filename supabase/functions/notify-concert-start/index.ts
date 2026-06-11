@@ -1,3 +1,15 @@
+/**
+ * Edge Function: notify-concert-start
+ *
+ * Called when an artist actually goes live for a scheduled concert. Fans out
+ * a `concert_live` event via `notify-user-event` to every ticket holder and
+ * follower so they can join immediately.
+ *
+ * @endpoint POST /functions/v1/notify-concert-start
+ * @body     { concertId: string }
+ * @returns  { success: boolean; notified: number }
+ * @see      supabase/functions/notify-user-event
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

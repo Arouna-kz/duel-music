@@ -1,3 +1,14 @@
+/**
+ * useAudioActivity
+ * ----------------
+ * Mesure le niveau audio d'un MediaStreamTrack via Web Audio AnalyserNode
+ * (RMS amplitude). Utilisé pour surligner la caméra qui parle dans un duel
+ * ou un concert avec invités.
+ *
+ * @param stream    - MediaStream ou track audio à analyser
+ * @param threshold - amplitude minimum pour considérer "en train de parler"
+ * @returns { isSpeaking, level }
+ */
 import { useEffect, useRef, useState } from "react";
 
 /**

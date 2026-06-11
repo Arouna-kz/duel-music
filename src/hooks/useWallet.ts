@@ -1,3 +1,16 @@
+/**
+ * useWallet
+ * ---------
+ * Lit le solde de crédits de l'utilisateur connecté depuis `wallets` et
+ * souscrit aux changements en temps réel (Realtime). Expose aussi un helper
+ * `refresh()` pour forcer un re-fetch après une transaction.
+ *
+ * Le solde est en CRÉDITS (entier). Conversion via `useCurrency` pour
+ * l'affichage dans la devise locale (1 crédit = `credit_value_usd` USD,
+ * configuré dans `platform_settings.economic_config`).
+ *
+ * @returns { credits, loading, refresh }
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 

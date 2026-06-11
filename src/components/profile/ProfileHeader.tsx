@@ -70,7 +70,7 @@ const ProfileHeader = ({ primaryRole, onMenuToggle, showMenuButton }: ProfileHea
   const langLabel = language === "fr" ? "FR" : "EN";
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/85 backdrop-blur-xl border-b border-border/50">
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background lg:bg-background/85 lg:backdrop-blur-xl border-b border-border/50">
       {style && <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${style.gradient} opacity-80`} />}
       <nav className="container mx-auto px-3 sm:px-4 h-16 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">

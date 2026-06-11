@@ -1,3 +1,16 @@
+/**
+ * Edge Function: moneroo-webhook-payout
+ *
+ * Public callback for Moneroo PayOut. HMAC-SHA256 signed. Dispatches to:
+ *   - `moneroo_confirm_payout` on success → marks the withdrawal completed.
+ *   - `moneroo_revert_payout` on definitive failure → refunds the wallet.
+ *
+ * @endpoint POST /functions/v1/moneroo-webhook-payout
+ * @headers  x-moneroo-signature: HMAC-SHA256 hex
+ * @returns  application/json { ok: true }
+ * @env      MONEROO_WEBHOOK_SECRET
+ * @see      supabase/functions/moneroo-payout-init, process-withdrawal
+ */
 // Moneroo PayOut webhook
 // Docs: https://docs.moneroo.io/
 // Public endpoint (verify_jwt = false). Auth via HMAC-SHA256 signature header.

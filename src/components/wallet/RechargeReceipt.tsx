@@ -1,3 +1,11 @@
+/**
+ * Wallet: RechargeReceipt — reçu post-paiement affiché au retour fournisseur.
+ *
+ * Lit les query params (`session_id` Stripe / `transaction_id` CinetPay /
+ * `payment_id` Moneroo), interroge la table de transactions correspondante
+ * et affiche un état clair : succès, en attente, échec — avec montant,
+ * crédits versés et bouton de retour wallet.
+ */
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";

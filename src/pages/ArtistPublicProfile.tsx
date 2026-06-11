@@ -16,6 +16,7 @@ import { PriceBadge } from "@/components/profile/PriceBadge";
 import { useUiPreferences } from "@/hooks/useUiPreferences";
 import { formatTz } from "@/lib/datetime";
 import SEO from "@/components/seo/SEO";
+import { AccountReportButton } from "@/components/streaming/AccountReportButton";
 interface ArtistProfile {
   id: string;
   user_id: string;
@@ -342,7 +343,7 @@ const ArtistPublicProfile = () => {
             )}
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap justify-center">
             <ShareButton contentType="artist_profile" contentId={id!} title={displayName} />
             <Button 
               onClick={handleFollow}
@@ -350,6 +351,14 @@ const ArtistPublicProfile = () => {
             >
               {isFollowing ? t("followingBtn") : t("followBtn")}
             </Button>
+            {currentUser && currentUser.id !== id && (
+              <AccountReportButton
+                reportedUserId={id!}
+                reportedUserName={displayName}
+                variant="outline"
+                size="sm"
+              />
+            )}
           </div>
         </motion.div>
 

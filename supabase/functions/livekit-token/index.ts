@@ -1,3 +1,17 @@
+/**
+ * Edge Function: livekit-token
+ *
+ * Issue a short-lived LiveKit access token for a room (duel/live/concert).
+ * Requires Supabase auth (Bearer JWT). The caller's `auth.uid()` is used as `identity`.
+ * Grants are derived from `role` ("host" | "guest" | "viewer"): hosts can publish A/V,
+ * guests can publish, viewers are subscribe-only.
+ *
+ * @endpoint POST /functions/v1/livekit-token
+ * @body     { room: string; role?: "host"|"guest"|"viewer"; name?: string; metadata?: any }
+ * @returns  { token: string; url: string; identity: string }
+ * @env      LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_WS_URL, SUPABASE_URL, SUPABASE_ANON_KEY
+ * @see      src/hooks/useLiveKit.ts (consumer)
+ */
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',

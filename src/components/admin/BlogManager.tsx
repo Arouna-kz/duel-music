@@ -1,3 +1,12 @@
+/**
+ * Admin: BlogManager — CRUD des articles de blog (table `blog_posts`).
+ *
+ * Création/édition/publication d'articles bilingues (FR/EN), gestion des
+ * slugs, images de couverture, statut publié/brouillon. Affiché publiquement
+ * sur `/blog` et `/blog/:slug`.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

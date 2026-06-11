@@ -1,3 +1,18 @@
+/**
+ * Edge Function: create-ticket-checkout
+ *
+ * Creates a Stripe Checkout Session for a paid concert ticket. Resolves the
+ * concert price/currency from `concerts`, validates seats availability and
+ * stores `concert_id` + `buyer_id` in the session metadata so the webhook can
+ * insert into `concert_tickets` on payment success.
+ *
+ * @endpoint POST /functions/v1/create-ticket-checkout
+ * @body     { concertId: string; successUrl?: string; cancelUrl?: string }
+ * @returns  { url: string; sessionId: string }
+ * @env      STRIPE_SECRET_KEY
+ * @see      supabase/functions/stripe-webhook (ticket fulfillment)
+ * @see      src/pages/ConcertDetail.tsx
+ */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";

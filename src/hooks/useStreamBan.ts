@@ -1,3 +1,21 @@
+/**
+ * useStreamBan
+ * ------------
+ * Détecte si l'utilisateur courant est banni pour un stream donné.
+ *
+ * Interroge deux sources :
+ *  1. `stream_bans` (event-scoped, posé par artiste/manager) — actif si
+ *     `stream_id` + `stream_type` correspondent
+ *  2. `platform_bans` (global, posé par admin) — actif si `expires_at`
+ *     est null ou futur
+ *
+ * Souscrit en Realtime pour mettre à jour `BannedAccessGate` instantanément
+ * dès qu'un ban est posé ou levé.
+ *
+ * @param streamId   - id de l'évènement
+ * @param streamType - 'live' | 'concert' | 'duel'
+ * @returns { scope: 'none'|'event'|'platform', reason?, expiresAt? }
+ */
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

@@ -3,7 +3,7 @@ import Footer from "@/components/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Database, Shield, Zap, Globe, Server, Code, Users, Lock, Layers, GitBranch } from "lucide-react";
+import { Database, Shield, Zap, Globe, Server, Code, Users, Lock, Layers, GitBranch, Bell, Smartphone, Radio, CreditCard, Table as TableIcon } from "lucide-react";
 
 const TechnicalDoc = () => {
   return (
@@ -231,6 +231,31 @@ const TechnicalDoc = () => {
                         <td className="py-2">Articles de blog avec vues</td>
                         <td className="py-2 text-muted-foreground">profiles</td>
                       </tr>
+                      <tr>
+                        <td className="py-2"><code className="bg-accent px-1 rounded">push_subscriptions</code></td>
+                        <td className="py-2">Abonnements Web Push (VAPID)</td>
+                        <td className="py-2 text-muted-foreground">profiles</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2"><code className="bg-accent px-1 rounded">credit_purchases</code></td>
+                        <td className="py-2">Recharges (Stripe / CinetPay / Moneroo)</td>
+                        <td className="py-2 text-muted-foreground">profiles</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2"><code className="bg-accent px-1 rounded">revenue_distributions</code></td>
+                        <td className="py-2">Répartition atomique des revenus (RPC)</td>
+                        <td className="py-2 text-muted-foreground">profiles, duels, gifts</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2"><code className="bg-accent px-1 rounded">payout_methods</code></td>
+                        <td className="py-2">Comptes de retrait Mobile Money / Bank</td>
+                        <td className="py-2 text-muted-foreground">profiles</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2"><code className="bg-accent px-1 rounded">platform_settings</code></td>
+                        <td className="py-2">Config clé/valeur (VAPID, pourcentages, contacts)</td>
+                        <td className="py-2 text-muted-foreground">-</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -279,6 +304,7 @@ const TechnicalDoc = () => {
                     <Badge variant="outline" className="border-red-500">admin</Badge>
                     <Badge variant="outline" className="border-purple-500">artist</Badge>
                     <Badge variant="outline" className="border-blue-500">manager</Badge>
+                    <Badge variant="outline" className="border-orange-500">moderator</Badge>
                     <Badge variant="outline" className="border-green-500">fan</Badge>
                   </div>
                 </div>
@@ -375,7 +401,67 @@ const TechnicalDoc = () => {
                       Upload direct depuis la galerie avec preview.
                     </p>
                   </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">CinetPay & Moneroo (Multi-pays Afrique)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Recharges et retraits Mobile Money pour 15+ pays (Orange Money, MTN, Moov, Wave, etc.).
+                      Secrets stockés par pays côté Cloud, init OAuth V2 via Edge Functions <code className="bg-accent px-1 rounded">cinetpay-payin-init</code> et <code className="bg-accent px-1 rounded">cinetpay-payout-init</code>, vérification canonique des webhooks.
+                    </p>
+                  </div>
+                  <div className="p-4 border rounded-lg">
+                    <h4 className="font-semibold mb-2">LiveKit Cloud (SFU)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Infrastructure SFU pour tous les flux (duels, lives, concerts). Token JWT généré par
+                      l'Edge Function <code className="bg-accent px-1 rounded">livekit-token</code>. Côté client, <code className="bg-accent px-1 rounded">useLiveKit</code> + <code className="bg-accent px-1 rounded">buildLocalStream</code> gèrent le miroir local et le switch caméra via <code className="bg-accent px-1 rounded">replaceTrack</code>.
+                    </p>
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Push Notifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-primary" />
+                  Notifications Push (Web Push API)
+                </CardTitle>
+                <CardDescription>Réception même quand l'onglet est fermé (Vercel / VPS)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  Le service worker <code className="bg-accent px-1 rounded">public/push-sw.js</code> écoute l'événement <code className="bg-accent px-1 rounded">push</code>
+                  et affiche une notification système. L'abonnement est stocké dans la table <code className="bg-accent px-1 rounded">push_subscriptions</code> (endpoint + p256dh + auth).
+                </p>
+                <div className="p-3 bg-accent/50 rounded-lg">
+                  <p className="font-semibold mb-1">Flux complet :</p>
+                  <ol className="list-decimal ml-5 space-y-1 text-muted-foreground">
+                    <li>L'utilisateur active les notifications dans <em>Profil → Préférences</em>.</li>
+                    <li>Le client demande la permission, s'abonne avec la VAPID public key (table <code>platform_settings.push_config</code>).</li>
+                    <li>L'abonnement est upserté dans <code>push_subscriptions</code>.</li>
+                    <li>Les Edge Functions appellent <code>send-push</code> qui signe la requête VAPID et POST sur l'endpoint.</li>
+                  </ol>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Secrets requis : <code className="bg-accent px-1 rounded">VAPID_PUBLIC_KEY</code>, <code className="bg-accent px-1 rounded">VAPID_PRIVATE_KEY</code>, <code className="bg-accent px-1 rounded">VAPID_SUBJECT</code>.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* PWA */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Smartphone className="w-5 h-5 text-primary" />
+                  PWA & Mobile
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>• Stratégie strictement <strong>Network-Only</strong> pour éviter tout cache obsolète.</p>
+                <p>• Limite Workbox 5 MB ; polling background toutes les 20 s.</p>
+                <p>• Clavier mobile stable via <strong>VisualViewport API</strong> en plein écran.</p>
+                <p>• Tabs responsives : <code className="bg-accent px-1 rounded">flex-wrap</code> + icônes en ligne, menu hamburger mobile.</p>
+                <p>• Tableau transactions modernisé (tri, recherche, pagination, taille de page) via <code className="bg-accent px-1 rounded">AdminTable</code>, traduit FR/EN.</p>
               </CardContent>
             </Card>
           </div>

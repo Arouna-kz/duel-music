@@ -1,3 +1,14 @@
+/**
+ * useMediaRecorder
+ * ----------------
+ * Wrapper React de l'API MediaRecorder pour enregistrer la sortie composite
+ * (Canvas + AudioContext mixé) d'un concert/duel en VOD.
+ *
+ * Upload progressif vers Supabase Storage (`replay-videos` bucket) puis
+ * insertion de `replay_videos` à la fin. Codec préféré : video/webm;codecs=vp9.
+ *
+ * @see mem://architecture/composite-recording-engine
+ */
 import { useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 

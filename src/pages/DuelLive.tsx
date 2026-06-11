@@ -1,3 +1,25 @@
+/**
+ * Page: DuelLive (/duels/:id/live)
+ *
+ * Salle live d'un duel d'artistes. Orchestre la diffusion WebRTC double-cam
+ * via `WebRTCDuelStream` (LiveKit SFU), le minuteur synchronisé serveur
+ * (`DuelVideoTimer` — état persistant en DB), les votes payants (`VotePanel`,
+ * RPC atomique), les cadeaux virtuels (`GiftPanel` + animations broadcastées),
+ * le chat threadé (`ThreadedChat`) et les annonces sponsor.
+ *
+ * Rôles & UI :
+ *   - Hôte (artiste participant) : contrôles caméra/micro, flip cam, focus mode.
+ *   - Manager (si assigné, exclusif au duel) : Hard Mute, contrôles modération.
+ *   - Spectateur : vote, gift, chat, réactions emoji/cœurs (broadcast channel).
+ *
+ * Sécurité : portails z-index 220 pour les animations cadeaux, failsafe timers
+ * sur les annonces gagnant. Tout achat passe par RPC pour éviter les races.
+ *
+ * @route   /duels/:id/live
+ * @see     src/components/duel/WebRTCDuelStream.tsx
+ * @see     src/components/duel/VotePanel.tsx, GiftPanel.tsx
+ * @see     supabase/functions/livekit-token
+ */
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +57,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Users, MicOff, Mic, Video, VideoOff, UserX, Timer, Heart, Maximize, Minimize, Eye, EyeOff, Trophy } from "lucide-react";
 import { ShareButton } from "@/components/sharing/ShareButton";
 import { ScheduledAccessGate } from "@/components/scheduling/ScheduledAccessGate";
+import { BannedAccessGate } from "@/components/streaming/BannedAccessGate";
+import { LiveReportButton } from "@/components/streaming/LiveReportButton";
 import { useToast } from "@/hooks/use-toast";
 
 interface Profile {
@@ -966,6 +990,7 @@ const DuelLive = () => {
           isAuthenticated={!!currentUserId}
           onPurchased={() => setHasTicket(true)}
         />
+        <BannedAccessGate streamType="duel" streamId={id!} currentUserId={currentUserId} />
         <div className="fixed inset-0 bg-black z-50">
           <div className="relative w-full h-full" ref={videoContainerRef}>
 
@@ -1221,6 +1246,7 @@ const DuelLive = () => {
         isAuthenticated={!!currentUserId}
         onPurchased={() => setHasTicket(true)}
       />
+      <BannedAccessGate streamType="duel" streamId={id!} currentUserId={currentUserId} />
       <Header />
       <main className="container mx-auto px-4 pt-24 pb-16">
         <div className="flex items-center justify-between mb-6">
@@ -1237,6 +1263,14 @@ const DuelLive = () => {
             <Badge variant="outline" className="flex items-center gap-1">
               <Users className="w-3 h-3" />{viewersCount} viewers
             </Badge>
+            {id && !isParticipant && (
+              <LiveReportButton
+                streamType="duel"
+                liveId={id}
+                viewerCount={viewersCount}
+                isArtist={!!isParticipant}
+              />
+            )}
           </div>
         </div>
 

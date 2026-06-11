@@ -1,3 +1,11 @@
+/**
+ * Admin: AdminDocumentsManager — accès rapide à la documentation interne.
+ *
+ * Liens vers `TechnicalDoc`, `ApiDocs`, `UserGuide`, `HelpCenter` et autres
+ * ressources réservées aux administrateurs et développeurs.
+ *
+ * @access  role=admin
+ */
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Code2, BookOpen, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";

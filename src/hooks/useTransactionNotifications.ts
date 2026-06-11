@@ -1,3 +1,13 @@
+/**
+ * useTransactionNotifications
+ * ---------------------------
+ * Souscrit à `notifications` filtrée par user_id pour afficher des toasts
+ * temps réel sur les évènements financiers (recharge confirmée, retrait
+ * validé/refusé, cadeau reçu, vote crédité, etc.).
+ *
+ * Doit être monté UNE seule fois au top-level (App.tsx ou layout) pour
+ * éviter les doublons.
+ */
 import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

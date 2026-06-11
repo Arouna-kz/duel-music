@@ -1,3 +1,13 @@
+/**
+ * Wallet: MonerooRechargeForm — formulaire de recharge via Moneroo.
+ *
+ * Sélection pays/devise/méthode (catalogue `_shared/moneroo-catalog.ts`),
+ * aperçu crédits via `useRechargePreview`, appel à `moneroo-payin-init`
+ * pour récupérer l'URL hosted. Confirmation via webhook HMAC-SHA256
+ * `moneroo-webhook-payin`.
+ *
+ * @see     supabase/functions/moneroo-payin-init
+ */
 import { useMemo, useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.moneroo-webhook-payout]
 verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false

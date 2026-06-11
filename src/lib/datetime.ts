@@ -1,3 +1,12 @@
+/**
+ * datetime
+ * --------
+ * Helpers de formatage de dates localisés (FR par défaut, EN si
+ * `localStorage.lang === 'en'`). Centralise les patterns pour garantir un
+ * affichage cohérent (`dd/MM/yyyy HH:mm` en FR, `MM/dd/yyyy hh:mm a` en EN).
+ *
+ * Toujours préférer ces helpers à `Date#toLocaleString` direct.
+ */
 import { format } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 

@@ -1,3 +1,13 @@
+/**
+ * Admin: TransactionsLedger — grand livre unifié des transactions.
+ *
+ * Liste paginée et filtrable de toutes les écritures financières
+ * (recharges, achats crédits, votes, cadeaux, retraits, remboursements)
+ * avec recherche par utilisateur, fournisseur, statut, période. Source de
+ * vérité pour les rapprochements comptables.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

@@ -1,6 +1,23 @@
-// Process a withdrawal_request via CinetPay, Moneroo or Stripe.
-// Called by admin (manual approval) or by client (when provider mode = auto_payout).
-// Validates auth + permissions then triggers the provider payout API.
+/**
+ * Edge Function: process-withdrawal
+ *
+ * Process a row from `withdrawal_requests` via the configured provider
+ * (CinetPay, Moneroo, or Stripe). Triggered either by an admin manual
+ * approval or directly by the client when `payout_config.mode = "auto_payout"`.
+ *
+ * Flow:
+ *  1. Validate caller (admin OR owner in auto mode).
+ *  2. Atomically reserve credits via the matching `*_reserve_payout` RPC.
+ *  3. Call provider PayOut API; on accept, status flips to `processing`.
+ *  4. Final settlement arrives via provider webhook → `*_confirm_payout`
+ *     or `*_revert_payout` (which refunds the user wallet).
+ *
+ * @endpoint POST /functions/v1/process-withdrawal
+ * @body     { request_id: string }
+ * @returns  { success: boolean; provider: string; merchant_transaction_id?: string }
+ * @see      supabase/functions/cinetpay-payout-init, moneroo-payout-init
+ * @see      src/components/artist/WithdrawalForm.tsx
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 
 const corsHeaders = {

@@ -1,3 +1,17 @@
+/**
+ * Edge Function: withdrawal-pin-reset
+ *
+ * Securely resets a user's withdrawal PIN. Sends a Resend email with a
+ * time-limited reset token and records the request in `withdrawal_pin_resets`.
+ * The PIN gate (`WithdrawalPinGate.tsx`) enforces this PIN on every payout
+ * confirmation to prevent unauthorized withdrawals.
+ *
+ * @endpoint POST /functions/v1/withdrawal-pin-reset
+ * @auth     Bearer JWT — authenticated user only.
+ * @env      RESEND_API_KEY
+ * @returns  application/json { ok: true }
+ * @see      src/components/profile/WithdrawalPinGate.tsx
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {

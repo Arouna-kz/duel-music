@@ -1,3 +1,15 @@
+/**
+ * Edge Function: admin-daily-report (CRON)
+ *
+ * Sent every morning to platform admins. Aggregates the previous 24h: new
+ * users, revenue (recharges, gifts, votes), active duels/concerts/lives,
+ * moderation actions and outstanding withdrawal requests. Renders a Resend
+ * email and ships to every user with the `admin` role.
+ *
+ * @endpoint POST /functions/v1/admin-daily-report
+ * @returns  { success: boolean; recipients: number }
+ * @env      RESEND_API_KEY
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

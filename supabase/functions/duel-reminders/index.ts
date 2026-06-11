@@ -1,3 +1,13 @@
+/**
+ * Edge Function: duel-reminders (CRON)
+ *
+ * Scheduled via `pg_cron`. Notifies subscribed fans of upcoming duels
+ * (`duel_scheduled` → `duel_live` transitions) using `notify-user-event`.
+ *
+ * @endpoint POST /functions/v1/duel-reminders
+ * @returns  { processed: number; notified: number }
+ * @see      supabase/functions/notify-user-event
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 

@@ -1,3 +1,14 @@
+/**
+ * AccountReportsManager
+ * ---------------------
+ * File d'attente admin des signalements de profils (`account_reports`).
+ *
+ * Workflow : open → reviewed | dismissed. Permet de consulter le profil
+ * signalé, le motif, le signaleur, puis d'agir (bannir le compte plateforme,
+ * désactiver le profil artiste, ou rejeter).
+ *
+ * Toute action met à jour `admin_logs` pour l'audit.
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

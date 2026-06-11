@@ -1,3 +1,13 @@
+/**
+ * Admin: PushConfigManager — configuration des notifications Web Push.
+ *
+ * Affiche l'état des clés VAPID (présence des secrets `VAPID_PUBLIC_KEY`,
+ * `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`), nombre d'abonnements actifs
+ * (`push_subscriptions`), et permet d'envoyer un push de test via
+ * `send-push`.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

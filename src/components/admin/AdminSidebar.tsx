@@ -1,3 +1,12 @@
+/**
+ * Admin: AdminSidebar — navigation latérale du dashboard admin.
+ *
+ * Onglets localisés (FR/EN) regroupés par catégories (Modération, Contenu,
+ * Paiements, Configuration…). Responsive : hamburger sur mobile, fixe sur
+ * desktop. Conserve la sélection dans l'URL via query param.
+ *
+ * @access  role=admin
+ */
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

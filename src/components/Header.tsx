@@ -114,7 +114,7 @@ const Header = () => {
           <img src={logoImg} alt="Duel Music" className="h-10 transition-transform group-hover:scale-105" />
         </Link>
 
-        {/* Desktop nav */}
+        {/* Desktop nav (≥ lg) */}
         <div className="hidden lg:flex items-center gap-6">
           {navLinks.map(link => (
             <Link key={link.to} to={link.to} className={navLinkClass(link.to)}>
@@ -128,30 +128,8 @@ const Header = () => {
           ))}
         </div>
 
-        {/* Medium screen nav */}
-        <div className="hidden md:flex lg:hidden items-center gap-4">
-          {navLinks.map(link => (
-            <Link key={link.to} to={link.to} className={`${navLinkClass(link.to)} text-sm`}>
-              {link.label}
-            </Link>
-          ))}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-foreground/80 gap-1 text-sm">
-                {t("more")} <ChevronDown className="w-3 h-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-card border-border">
-              {moreLinks.map(link => (
-                <DropdownMenuItem key={link.to} asChild className="cursor-pointer">
-                  <Link to={link.to}>{link.label}</Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="hidden md:flex items-center gap-2">
+        {/* Desktop actions (≥ lg) */}
+        <div className="hidden lg:flex items-center gap-2">
           <WalletDisplay />
 
           <DropdownMenu>
@@ -203,36 +181,48 @@ const Header = () => {
           )}
         </div>
 
-        <div className="flex md:hidden items-center gap-1">
+        {/* Mobile + tablet actions (< lg) */}
+        <div className="flex lg:hidden items-center gap-1.5">
           {user && <WalletDisplay />}
           {user && (
-            <Link to="/gift-shop">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Gift className="w-5 h-5 text-primary" />
-              </Button>
-            </Link>
+            <>
+              <Link to="/gift-shop">
+                <Button variant="ghost" size="icon" className="h-9 w-9">
+                  <Gift className="w-5 h-5 text-primary" />
+                </Button>
+              </Link>
+              <NotificationBell />
+            </>
           )}
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="h-9 w-9"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Menu"
           >
             <Menu className="w-6 h-6" />
           </Button>
         </div>
       </nav>
 
-      {/* Mobile menu */}
+      {/* Mobile/tablet menu (< lg) */}
       {isMenuOpen && (
-        <div className="md:hidden bg-card border-t border-border animate-fade-in">
+        <div className="lg:hidden bg-card border-t border-border animate-fade-in">
           <div className="container mx-auto px-4 py-4 flex flex-col gap-3">
-            {[...navLinks, ...moreLinks].map(link => (
-              <Link key={link.to} to={link.to} className={`py-2 ${isActive(link.to) ? "text-primary font-semibold" : "text-foreground/80 hover:text-foreground"}`} onClick={() => setIsMenuOpen(false)}>
-                {link.label}
-              </Link>
-            ))}
-            <div className="flex gap-2 pt-2 border-t border-border">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[...navLinks, ...moreLinks].map(link => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className={`py-2.5 px-3 rounded-lg text-center transition-colors ${isActive(link.to) ? "bg-primary/10 text-primary font-semibold" : "text-foreground/80 hover:bg-muted"}`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="text-foreground gap-1">
@@ -240,7 +230,7 @@ const Header = () => {
                     <span className="text-xs font-semibold">{langLabel}</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-card border-border">
+                <DropdownMenuContent align="start" className="bg-card border-border">
                   <DropdownMenuItem onClick={() => setLanguage("fr")} className={`cursor-pointer ${language === "fr" ? "bg-primary/10 text-primary font-semibold" : ""}`}>
                     🇫🇷 Français
                   </DropdownMenuItem>
@@ -252,17 +242,15 @@ const Header = () => {
               <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="text-foreground">
                 {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </Button>
-            </div>
-            <div className="flex flex-col gap-2 pt-2 border-t border-border">
               {user ? (
-                <Link to="/profile" onClick={() => setIsMenuOpen(false)}>
+                <Link to="/profile" onClick={() => setIsMenuOpen(false)} className="flex-1">
                   <Button className="w-full bg-gradient-primary">
                     <User className="w-4 h-4 mr-2" />
                     {t("myProfileBtn")}
                   </Button>
                 </Link>
               ) : (
-                <Link to="/auth" onClick={() => setIsMenuOpen(false)}>
+                <Link to="/auth" onClick={() => setIsMenuOpen(false)} className="flex-1">
                   <Button className="w-full bg-gradient-primary">
                     {t("login")}
                   </Button>

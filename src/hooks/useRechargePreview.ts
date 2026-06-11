@@ -1,3 +1,14 @@
+/**
+ * useRechargePreview
+ * ------------------
+ * Calcule en temps réel le nombre de crédits que recevra l'utilisateur pour
+ * une recharge (montant, devise, provider). Réplique côté client la logique
+ * de `supabase/functions/_shared/recharge-credits.ts` : applique les frais
+ * provider, convertit en USD, divise par `credit_value_usd`.
+ *
+ * Utilisé par CinetPayRechargeForm / MonerooRechargeForm pour afficher
+ * RechargeBreakdown avant validation.
+ */
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";

@@ -1,3 +1,13 @@
+/**
+ * useWebRTC (legacy peer-to-peer)
+ * -------------------------------
+ * Implémentation P2P RTCPeerConnection conservée pour les flux 1-à-1
+ * (ex: invitations privées de scène). La diffusion principale utilise
+ * désormais `useLiveKit` (SFU) — préférer LiveKit pour tout nouveau code.
+ *
+ * Gère : offer/answer/ICE via `useWebRTCSignaling`, attach des media
+ * streams aux <video> refs, reconnexion sur échec.
+ */
 import { useEffect, useRef, useState, useCallback } from "react";
 
 interface PeerConnection {

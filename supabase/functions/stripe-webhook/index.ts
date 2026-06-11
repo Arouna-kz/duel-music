@@ -1,3 +1,19 @@
+/**
+ * Edge Function: stripe-webhook
+ *
+ * Stripe events endpoint. Verifies the `Stripe-Signature` header against
+ * `STRIPE_WEBHOOK_SECRET`, then dispatches by event type:
+ *  - `checkout.session.completed` → credit wallet (recharge) or grant ticket
+ *    (concert/duel) / subscription (`user_subscriptions`).
+ *  - `customer.subscription.updated|deleted` → sync plan & status.
+ *  - `payout.paid|failed` → finalize `withdrawal_requests` row.
+ *
+ * Idempotent — replays are detected via `stripe_event_id` uniqueness.
+ *
+ * @endpoint POST /functions/v1/stripe-webhook  (verify_jwt = false)
+ * @env      STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+ * @see      supabase/functions/create-checkout, create-ticket-checkout
+ */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";

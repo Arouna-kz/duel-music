@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Maximize, Minimize, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface VideoZoomWrapperProps {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ export const VideoZoomWrapper = ({
   className = "",
 }: VideoZoomWrapperProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const toggleFullscreen = useCallback(async () => {
@@ -83,7 +85,7 @@ export const VideoZoomWrapper = ({
 
       {/* Controls for focused video */}
       {isFocused && (
-        <div className="absolute top-2 right-2 z-30 flex gap-1">
+        <div className={`absolute z-30 flex gap-1 ${isMobile ? "top-3 right-[3.5rem]" : "top-2 right-2"}`}>
           <Button
             size="icon"
             variant="ghost"
@@ -109,7 +111,7 @@ export const VideoZoomWrapper = ({
 
       {/* Fullscreen button always visible on hover for any video */}
       {!isFocused && (
-        <div className="absolute top-2 right-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className={`absolute z-30 opacity-0 group-hover:opacity-100 transition-opacity ${isMobile ? "top-3 right-[3.5rem] opacity-100" : "top-2 right-2"}`}>
           <Button
             size="icon"
             variant="ghost"

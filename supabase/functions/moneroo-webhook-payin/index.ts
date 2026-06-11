@@ -1,3 +1,17 @@
+/**
+ * Edge Function: moneroo-webhook-payin
+ *
+ * Public callback for Moneroo PayIn (verify_jwt = false). Authenticated via
+ * an HMAC-SHA256 signature header (shared secret). On `payment.success`,
+ * calls the `moneroo_confirm_payin` RPC to credit the user wallet atomically
+ * and idempotently mark `moneroo_transactions` as `succeeded`.
+ *
+ * @endpoint POST /functions/v1/moneroo-webhook-payin
+ * @headers  x-moneroo-signature: HMAC-SHA256 hex(secret, rawBody)
+ * @returns  application/json { ok: true }
+ * @env      MONEROO_WEBHOOK_SECRET
+ * @see      supabase/functions/moneroo-payin-init
+ */
 // Moneroo PayIn webhook
 // Docs: https://docs.moneroo.io/
 // Public endpoint (verify_jwt = false). Auth via HMAC-SHA256 signature header.

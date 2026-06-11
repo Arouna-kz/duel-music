@@ -1,3 +1,28 @@
+/**
+ * Page: Admin (/admin)
+ *
+ * Tableau de bord administrateur global de la plateforme. Centralise toutes
+ * les opérations de gouvernance : utilisateurs, artistes/managers, duels,
+ * concerts, lives, replays, lifestyle, paiements, modération, configuration
+ * et statistiques.
+ *
+ * Accès : réservé aux utilisateurs ayant le rôle `admin` dans `user_roles`
+ * (vérifié via la RPC `has_role`). Toute action sensible (bannissement,
+ * suppression, validation, ajustement de config) est journalisée dans
+ * `admin_logs` via le sous-composant correspondant.
+ *
+ * Organisation :
+ *   - Onglets `<Tabs>` : Stats, Users, Artists, Managers, Duels, Concerts,
+ *     Lives, Replays, Lifestyle, Moderation, Payments, Config, Logs…
+ *   - Chaque onglet délègue à un sous-composant dédié dans `components/admin/`.
+ *   - Confirmations sensibles via `useConfirmDialog` (jamais de `window.confirm`).
+ *
+ * @route   /admin
+ * @access  role=admin
+ * @see     src/components/admin/AdminSidebar.tsx
+ * @see     src/components/admin/ModerationDashboard.tsx
+ * @see     src/components/admin/PlatformConfigManager.tsx
+ */
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +47,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BlogManager } from "@/components/admin/BlogManager";
-import { AccountReportsManager } from "@/components/admin/AccountReportsManager";
+import { ModerationDashboard } from "@/components/admin/ModerationDashboard";
 import AdminStats from "@/components/admin/AdminStats";
 import { AdminTable } from "@/components/admin/AdminTable";
 import { SocialLinksDisplay } from "@/components/admin/SocialLinksDisplay";
@@ -958,7 +983,7 @@ const Admin = () => {
               </div>
 
               {/* Stats Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2.5 mb-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-2.5 mb-6 relative isolate">
                 {[
                   { label: t("adminUsers"), value: stats.totalUsers, icon: Users, color: "" },
                   { label: t("adminConcerts"), value: stats.totalConcerts, icon: Music, color: "" },
@@ -970,7 +995,7 @@ const Admin = () => {
                   { label: t("adminDuelReq"), value: stats.pendingDuelRequests, icon: Swords, color: "text-purple-500 border-purple-500/50" },
                   { label: t("adminWithdrawals"), value: stats.pendingWithdrawals, icon: DollarSign, color: "text-green-500 border-green-500/50" },
                 ].map(({ label, value, icon: Icon, color }) => (
-                  <Card key={label} className={`border-border/60 ${color ? color.split(" ").slice(1).join(" ") : ""}`}>
+                  <Card key={label} className={`bg-card transform-gpu border-border/60 ${color ? color.split(" ").slice(1).join(" ") : ""}`}>
                     <CardHeader className="flex flex-row items-center justify-between pb-1 pt-2.5 px-3">
                       <CardTitle className={`text-[10px] font-medium ${color.split(" ")[0] || "text-muted-foreground"}`}>{label}</CardTitle>
                       <Icon className={`h-3 w-3 ${color.split(" ")[0] || "text-muted-foreground"}`} />
@@ -1584,7 +1609,7 @@ const Admin = () => {
 
             {/* ── Signalements ────────────────────────────────────────────── */}
             <TabsContent value="reports">
-              <AccountReportsManager />
+              <ModerationDashboard />
             </TabsContent>
 
             {/* ── Blog ──────────────────────────────────────────────────────── */}

@@ -1,3 +1,17 @@
+/**
+ * Edge Function: cinetpay-payout-init
+ *
+ * Initiate a CinetPay PayOut (Mobile Money transfer) for a validated
+ * `withdrawal_requests` row. Auto-detects destination country from the
+ * phone prefix when not provided, reserves credits via
+ * `cinetpay_reserve_payout` RPC, then calls CinetPay `/v1/transfer/money/send/contact`.
+ * Final state arrives via `cinetpay-webhook-payout`.
+ *
+ * @endpoint POST /functions/v1/cinetpay-payout-init  (admin or system-only)
+ * @body     { request_id: string; phone: string; country_code?: string }
+ * @returns  { success: boolean; merchant_transaction_id: string }
+ * @see      supabase/functions/process-withdrawal/index.ts
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, cinetpayFetch, genMerchantId, genNotifyToken, detectCountryByPhone, type CountryConfig } from "../_shared/cinetpay.ts";
 

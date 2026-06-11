@@ -1,3 +1,13 @@
+/**
+ * videoFilters
+ * ------------
+ * Catalogue de TrackProcessors LiveKit appliqués à la track caméra locale.
+ * Chaque filtre = pipeline Canvas2D/OffscreenCanvas qui lit chaque frame et
+ * dessine la version filtrée avant publication SFU.
+ *
+ * Pour ajouter un filtre : exporter un `TrackProcessor<VideoProcessorOptions>`
+ * et l'enregistrer dans le registre exporté plus bas.
+ */
 import type { Room, TrackProcessor, VideoProcessorOptions } from "livekit-client";
 import { Track } from "livekit-client";
 

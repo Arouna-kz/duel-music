@@ -1,5 +1,17 @@
-// Moneroo PayOut init — initiate a transfer to Mobile Money.
-// Docs: https://docs.moneroo.io/api-reference/payouts/initialize
+/**
+ * Edge Function: moneroo-payout-init
+ *
+ * Initiate a Moneroo PayOut (Mobile Money transfer) for a validated
+ * `withdrawal_requests` row. Reserves credits atomically via the
+ * `moneroo_reserve_payout` RPC, then calls Moneroo `/v1/payouts/initialize`.
+ * Final state arrives via `moneroo-webhook-payout`
+ * (`moneroo_confirm_payout` on success, `moneroo_revert_payout` on failure).
+ *
+ * @endpoint POST /functions/v1/moneroo-payout-init  (admin or system-only)
+ * @body     { request_id: string; method: string; phone: string; country: string }
+ * @returns  { success: boolean; merchant_transaction_id: string }
+ * @see      supabase/functions/process-withdrawal/index.ts (orchestrator)
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, genMerchantId, monerooCall } from "../_shared/moneroo.ts";
 import { MONEROO_SANDBOX, getCurrencyForMethod, getPayoutFieldName } from "../_shared/moneroo-catalog.ts";

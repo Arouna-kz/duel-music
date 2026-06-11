@@ -1,3 +1,13 @@
+/**
+ * Wallet: CinetPayRechargeForm — formulaire de recharge Mobile Money via CinetPay.
+ *
+ * Détecte le pays par préfixe (`cinetpay_countries`), affiche les opérateurs
+ * disponibles, calcule l'aperçu crédits via `useRechargePreview`, puis
+ * appelle `cinetpay-payin-init` pour obtenir l'URL de paiement (Seamless).
+ * La confirmation arrive via `cinetpay-webhook-payin` → RPC atomique.
+ *
+ * @see     supabase/functions/cinetpay-payin-init
+ */
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";

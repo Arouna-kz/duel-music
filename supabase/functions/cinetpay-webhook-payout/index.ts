@@ -1,3 +1,16 @@
+/**
+ * Edge Function: cinetpay-webhook-payout
+ *
+ * Public callback for CinetPay Transfer (PayOut). Verifies the notification
+ * token (`timingSafeEqual`) and the transaction state via CinetPay's
+ * `/v1/transfer/check`, then dispatches the matching RPC:
+ *   - `cinetpay_confirm_payout` → marks `withdrawal_requests` as completed.
+ *   - `cinetpay_revert_payout`  → refunds the user wallet on definitive failure.
+ *
+ * @endpoint POST /functions/v1/cinetpay-webhook-payout
+ * @returns  text/plain "OK"
+ * @see      supabase/functions/cinetpay-payout-init, process-withdrawal
+ */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { corsHeaders, cinetpayFetch, timingSafeEqual, type CountryConfig } from "../_shared/cinetpay.ts";
 

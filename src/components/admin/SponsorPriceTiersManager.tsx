@@ -1,3 +1,12 @@
+/**
+ * Admin: SponsorPriceTiersManager — paliers tarifaires sponsors.
+ *
+ * CRUD des tiers de prix proposés aux sponsors (durée, emplacement,
+ * portée). Utilisé par `SponsorRequestSection` côté sponsor pour générer
+ * le devis et déclencher le paiement Stripe.
+ *
+ * @access  role=admin
+ */
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
